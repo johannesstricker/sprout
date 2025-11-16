@@ -18,8 +18,13 @@ help:
 install:
 	@echo "Installing sprout to $(INSTALL_DIR)..."
 	@mkdir -p $(INSTALL_DIR)
+	@mkdir -p $(PREFIX)/lib/commands
 	@cp bin/sprout $(INSTALL_DIR)/sprout
 	@chmod +x $(INSTALL_DIR)/sprout
+	@cp lib/config.sh $(PREFIX)/lib/config.sh
+	@cp lib/hooks.sh $(PREFIX)/lib/hooks.sh
+	@cp lib/utils.sh $(PREFIX)/lib/utils.sh
+	@cp lib/commands/*.sh $(PREFIX)/lib/commands/
 	@echo "✓ Sprout installed successfully!"
 	@echo ""
 	@echo "Next steps:"
@@ -30,6 +35,8 @@ install:
 uninstall:
 	@if [ -f $(INSTALL_DIR)/sprout ]; then \
 		rm $(INSTALL_DIR)/sprout; \
+		rm -f $(PREFIX)/lib/config.sh $(PREFIX)/lib/hooks.sh $(PREFIX)/lib/utils.sh; \
+		rm -rf $(PREFIX)/lib/commands; \
 		echo "✓ Sprout uninstalled successfully!"; \
 	else \
 		echo "Sprout not found at $(INSTALL_DIR)/sprout"; \
