@@ -1,0 +1,114 @@
+#!/bin/bash
+set -euo pipefail
+
+# Sprout: A git worktree management utility
+# This is the main entry point for the sprout command
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+LIB_DIR="$PROJECT_ROOT/lib"
+
+# Source utility libraries
+source "$LIB_DIR/config.sh"
+source "$LIB_DIR/hooks.sh"
+source "$LIB_DIR/utils.sh"
+
+# Source command implementations
+source "$LIB_DIR/commands/add.sh"
+source "$LIB_DIR/commands/dir.sh"
+source "$LIB_DIR/commands/rm.sh"
+source "$LIB_DIR/commands/open.sh"
+
+# Display help message
+show_help() {
+    cat << 'EOF'
+Sprout - Git worktree management utility
+
+Usage: sprout <command> [options]
+
+Commands:
+  add <name>          Create a new worktree
+                      Options:
+                        -b <branch>   Checkout a specific branch (default: main)
+
+  dir <name>          Print the directory path of a worktree
+
+  rm <name>           Remove a worktree
+                      Options:
+                        -f            Force removal
+
+  open <name>         Open a worktree with the configured editor
+
+  config              Manage sprout configuration
+                      Subcommands:
+                        set <key> <value>   Set a configuration value
+                        get <key>           Get a configuration value
+                        show                Show all configuration
+
+  help                Show this help message
+
+Configuration:
+  The global config file is located at: ~/.sproutrc
+
+  Available options:
+    worktree_dir      Base directory for all worktrees (default: ~/.sprout)
+    editor            Editor to use with 'open' command (default: code)
+
+Hooks:
+  You can define initialization hooks in your repository:
+    .sprout/init      Shell script executed when creating a worktree
+
+EOF
+}
+
+# Parse global options and command
+parse_args() {
+    local cmd="${1:-}"
+
+    case "$cmd" in
+        add|dir|rm|open|config|help|-h|--help|"")
+            return 0
+            ;;
+        *)
+            echo "Error: Unknown command '$cmd'" >&2
+            show_help >&2
+            return 1
+            ;;
+    esac
+}
+
+# Main entry point
+main() {
+    local cmd="${1:-help}"
+    shift || true
+
+    parse_args "$cmd" || return 1
+
+    case "$cmd" in
+        add)
+            cmd_add "$@"
+            ;;
+        dir)
+            cmd_dir "$@"
+            ;;
+        rm)
+            cmd_rm "$@"
+            ;;
+        open)
+            cmd_open "$@"
+            ;;
+        config)
+            cmd_config "$@"
+            ;;
+        help|-h|--help)
+            show_help
+            ;;
+        *)
+            echo "Error: Unknown command '$cmd'" >&2
+            show_help >&2
+            return 1
+            ;;
+    esac
+}
+
+main "$@"

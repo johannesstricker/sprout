@@ -1,0 +1,28 @@
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+
+# Config files (local only)
+.sproutrc.local
+
+# Test coverage
+coverage/
+.coverage
+*.lcov
+
+# Dependency directories
+node_modules/
+.venv/
+venv/
+
+# OS files
+Thumbs.db
+.directory
