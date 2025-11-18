@@ -35,6 +35,8 @@ Commands:
   dir <name>          Print the directory path of a worktree
 
   list                List all worktrees in the current repository
+                      Options:
+                        --verbose, --full, -v   Show full paths instead of names
 
   rm <name>           Remove a worktree
                       Options:
