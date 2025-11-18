@@ -217,6 +217,68 @@ test_list_verbose() {
     [ "$has_full_path" = true ]
 }
 
+# Test: List command with slash in worktree name
+test_list_with_slash() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # Create a test repo
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    # Create initial commit
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    # Initialize sprout config
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    # Create worktrees with slashes in names
+    "$PROJECT_ROOT/bin/sprout" add "feat/add-new-feature" > /dev/null 2>&1 || true
+    "$PROJECT_ROOT/bin/sprout" add "fix/bug-123" > /dev/null 2>&1 || true
+    "$PROJECT_ROOT/bin/sprout" add "simple" > /dev/null 2>&1 || true
+
+    # Get list output
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" list 2>&1)
+
+    # Convert to array for checking
+    local -a lines
+    mapfile -t lines <<< "$output"
+
+    # Should have 3 worktrees
+    local count=${#lines[@]}
+
+    # Check that full names with slashes are preserved
+    local has_feat=false
+    local has_fix=false
+    local has_simple=false
+
+    for line in "${lines[@]}"; do
+        if [[ "$line" == "feat/add-new-feature" ]]; then
+            has_feat=true
+        elif [[ "$line" == "fix/bug-123" ]]; then
+            has_fix=true
+        elif [[ "$line" == "simple" ]]; then
+            has_simple=true
+        fi
+    done
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    # Verify all worktrees were found with correct names
+    [ "$count" -eq 3 ] && [ "$has_feat" = true ] && [ "$has_fix" = true ] && [ "$has_simple" = true ]
+}
+
 # Run all tests
 echo "Core Tests:"
 echo "-----------"
@@ -237,6 +299,7 @@ echo "-------------------"
 run_test "List command with no worktrees" "test_list_empty"
 run_test "List command output is sorted" "test_list_sorted"
 run_test "List command with --verbose flag" "test_list_verbose"
+run_test "List command with slash in worktree name" "test_list_with_slash"
 
 echo ""
 echo "======================="

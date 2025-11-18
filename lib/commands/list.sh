@@ -28,18 +28,25 @@ cmd_list() {
         return 0
     fi
 
-    # Collect valid worktrees into an array
+    # Collect valid worktrees into an array using git worktree list
     local -a worktrees=()
 
-    for dir in "$worktrees_dir"/*; do
-        if [[ -d "$dir" ]] && is_git_worktree "$dir"; then
-            if [[ "$verbose" == true ]]; then
-                worktrees+=("$dir")
-            else
-                worktrees+=("$(basename "$dir")")
+    # Use git worktree list to get all worktrees, then filter for our managed directory
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^worktree\ (.+)$ ]]; then
+            local worktree_path="${BASH_REMATCH[1]}"
+            # Only include worktrees in our managed directory
+            if [[ "$worktree_path" == "$worktrees_dir"/* ]]; then
+                if [[ "$verbose" == true ]]; then
+                    worktrees+=("$worktree_path")
+                else
+                    # Extract relative path from worktrees_dir
+                    local relative_path="${worktree_path#"$worktrees_dir/"}"
+                    worktrees+=("$relative_path")
+                fi
             fi
         fi
-    done
+    done < <(git worktree list --porcelain)
 
     # Sort and print worktrees
     if [[ ${#worktrees[@]} -gt 0 ]]; then
