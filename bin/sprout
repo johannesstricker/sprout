@@ -16,6 +16,7 @@ source "$LIB_DIR/utils.sh"
 # Source command implementations
 source "$LIB_DIR/commands/add.sh"
 source "$LIB_DIR/commands/dir.sh"
+source "$LIB_DIR/commands/list.sh"
 source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
 
@@ -32,6 +33,8 @@ Commands:
                         -b <branch>   Checkout a specific branch (default: main)
 
   dir <name>          Print the directory path of a worktree
+
+  list                List all worktrees in the current repository
 
   rm <name>           Remove a worktree
                       Options:
@@ -66,7 +69,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|rm|open|config|help|-h|--help|"")
+        add|dir|list|rm|open|config|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -90,6 +93,9 @@ main() {
             ;;
         dir)
             cmd_dir "$@"
+            ;;
+        list)
+            cmd_list "$@"
             ;;
         rm)
             cmd_rm "$@"

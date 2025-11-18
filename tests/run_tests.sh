@@ -45,6 +45,7 @@ test_libraries_exist() {
     [ -f "$PROJECT_ROOT/lib/hooks.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/add.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/dir.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/list.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/rm.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/open.sh" ]
 }
