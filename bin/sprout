@@ -19,6 +19,7 @@ source "$LIB_DIR/commands/dir.sh"
 source "$LIB_DIR/commands/list.sh"
 source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
+source "$LIB_DIR/commands/shellenv.sh"
 
 # Display help message
 show_help() {
@@ -50,6 +51,10 @@ Commands:
                         get <key>           Get a configuration value
                         show                Show all configuration
 
+  shellenv [shell]    Output shell completions for tab completion
+                      Auto-detects shell if not specified
+                      Supported shells: bash, zsh, fish
+
   help                Show this help message
 
 Configuration:
@@ -71,7 +76,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|list|rm|open|config|help|-h|--help|"")
+        add|dir|list|rm|open|config|shellenv|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -107,6 +112,9 @@ main() {
             ;;
         config)
             cmd_config "$@"
+            ;;
+        shellenv)
+            cmd_shellenv "$@"
             ;;
         help|-h|--help)
             show_help
