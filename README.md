@@ -26,6 +26,32 @@ export PATH="$PWD/bin:$PATH"
 ln -s "$(pwd)/bin/sprout" /usr/local/bin/sprout
 ```
 
+### Shell Completions
+
+Enable tab completion for sprout commands:
+
+#### Bash
+```bash
+# Add to ~/.bashrc
+eval "$(sprout shellenv bash)"
+```
+
+#### Zsh
+```bash
+# Add to ~/.zshrc
+eval "$(sprout shellenv zsh)"
+```
+
+#### Fish
+```bash
+sprout shellenv fish > ~/.config/fish/completions/sprout.fish
+```
+
+Note: `sprout shellenv` auto-detects your shell, so you can also use:
+```bash
+eval "$(sprout shellenv)"
+```
+
 ### Configuration
 
 Sprout stores its configuration in `~/.sproutrc`. You can modify it manually or use the `sprout config` command:
