@@ -173,7 +173,8 @@ if ! type _git_branch_names &>/dev/null; then
     }
 fi
 
-_sprout "$@"
+# Register the completion function
+compdef _sprout sprout
 ZSH_COMPLETION
 }
 
