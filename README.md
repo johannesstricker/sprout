@@ -215,26 +215,19 @@ Now every worktree will automatically have these set up!
 
 ## Shell Completions
 
-Sprout includes tab completion for **zsh**, **bash**, and **fish**. Completions cover commands, worktree names, flags, config keys, and git branches.
+Shell completions for **zsh**, **bash**, and **fish** are installed automatically with `make install`. They cover commands, worktree names, flags, config keys, and git branches.
 
-### Install via Makefile
-
-```bash
-make install-completions
-```
-
-This installs completions to standard system directories. Use `PREFIX` to customize:
+You may need to restart your shell after installation. For zsh, you can also run:
 
 ```bash
-make install-completions PREFIX=$HOME/.local
+autoload -Uz compinit && compinit
 ```
 
-### Manual Setup
+### Manual Setup (without Makefile)
 
 **Zsh** - copy `completions/_sprout` to a directory in your `$fpath`:
 
 ```bash
-# Using a custom completions directory
 mkdir -p ~/.zsh/completions
 cp completions/_sprout ~/.zsh/completions/
 # Add to ~/.zshrc:
