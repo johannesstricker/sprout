@@ -47,7 +47,8 @@ test_libraries_exist() {
     [ -f "$PROJECT_ROOT/lib/commands/dir.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/list.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/rm.sh" ] && \
-    [ -f "$PROJECT_ROOT/lib/commands/open.sh" ]
+    [ -f "$PROJECT_ROOT/lib/commands/open.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/start.sh" ]
 }
 
 # Test: Help command works

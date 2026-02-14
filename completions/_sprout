@@ -28,6 +28,7 @@ _sprout() {
         'list:List all worktrees'
         'rm:Remove a worktree'
         'open:Open a worktree with the configured editor'
+        'start:Create a new worktree and open it in the editor'
         'config:Manage sprout configuration'
         'help:Show help message'
     )
@@ -62,6 +63,12 @@ _sprout() {
                 open)
                     _arguments \
                         '1:worktree:_sprout_worktrees' \
+                        '(-e --editor)'{-e,--editor}'[Use specific editor]:editor:_command_names'
+                    ;;
+                start)
+                    _arguments \
+                        '1:name:' \
+                        '-b[Checkout a specific branch]:branch:_sprout_branches' \
                         '(-e --editor)'{-e,--editor}'[Use specific editor]:editor:_command_names'
                     ;;
                 config)

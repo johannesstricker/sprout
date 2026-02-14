@@ -4,7 +4,7 @@ _sprout() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="add dir list rm open config help"
+    local commands="add dir list rm open start config help"
     local config_subcmds="set get show"
     local config_keys="worktree_dir editor"
 
@@ -76,6 +76,23 @@ _sprout() {
                         local worktrees
                         worktrees=$(sprout list 2>/dev/null)
                         COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))
+                    fi
+                    ;;
+            esac
+            ;;
+        start)
+            case "$prev" in
+                -b)
+                    local branches
+                    branches=$(git branch -a --format='%(refname:short)' 2>/dev/null | sed 's|^origin/||' | sort -u)
+                    COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+                    ;;
+                -e|--editor)
+                    COMPREPLY=($(compgen -c -- "$cur"))
+                    ;;
+                *)
+                    if [[ "$cur" == -* ]]; then
+                        COMPREPLY=($(compgen -W "-b -e --editor" -- "$cur"))
                     fi
                     ;;
             esac
