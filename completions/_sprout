@@ -1,0 +1,100 @@
+#compdef sprout
+
+# Zsh completion for sprout - Git worktree management utility
+
+# Complete worktree names by calling `sprout list`
+_sprout_worktrees() {
+    local -a worktrees
+    worktrees=(${(f)"$(sprout list 2>/dev/null)"})
+    if (( ${#worktrees} )); then
+        _describe 'worktree' worktrees
+    fi
+}
+
+# Complete git branch names
+_sprout_branches() {
+    local -a branches
+    branches=(${(f)"$(git branch -a --format='%(refname:short)' 2>/dev/null | sed 's|^origin/||' | sort -u)"})
+    if (( ${#branches} )); then
+        _describe 'branch' branches
+    fi
+}
+
+_sprout() {
+    local -a commands
+    commands=(
+        'add:Create a new worktree'
+        'dir:Print the directory path of a worktree'
+        'list:List all worktrees'
+        'rm:Remove a worktree'
+        'open:Open a worktree with the configured editor'
+        'config:Manage sprout configuration'
+        'help:Show help message'
+    )
+
+    _arguments -C \
+        '1:command:->command' \
+        '*::arg:->args'
+
+    case $state in
+        command)
+            _describe 'command' commands
+            ;;
+        args)
+            case $words[1] in
+                add)
+                    _arguments \
+                        '1:name:' \
+                        '-b[Checkout a specific branch]:branch:_sprout_branches'
+                    ;;
+                dir)
+                    _arguments '1:worktree:_sprout_worktrees'
+                    ;;
+                list)
+                    _arguments \
+                        '(--verbose --full -v)'{--verbose,--full,-v}'[Show full paths instead of names]'
+                    ;;
+                rm)
+                    _arguments \
+                        '1:worktree:_sprout_worktrees' \
+                        '(-f --force)'{-f,--force}'[Force removal]'
+                    ;;
+                open)
+                    _arguments \
+                        '1:worktree:_sprout_worktrees' \
+                        '(-e --editor)'{-e,--editor}'[Use specific editor]:editor:_command_names'
+                    ;;
+                config)
+                    local -a config_subcmds
+                    config_subcmds=(
+                        'set:Set a configuration value'
+                        'get:Get a configuration value'
+                        'show:Show all configuration'
+                    )
+                    _arguments -C '1:subcommand:->config_subcmd' '*::arg:->config_args'
+                    case $state in
+                        config_subcmd)
+                            _describe 'config subcommand' config_subcmds
+                            ;;
+                        config_args)
+                            case $words[1] in
+                                set)
+                                    _arguments \
+                                        '1:key:(worktree_dir editor)' \
+                                        '2:value:'
+                                    ;;
+                                get)
+                                    _arguments '1:key:(worktree_dir editor)'
+                                    ;;
+                            esac
+                            ;;
+                    esac
+                    ;;
+                help)
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_sprout "$@"

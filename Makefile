@@ -2,6 +2,9 @@
 
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)/bin
+ZSH_COMPLETIONS_DIR ?= $(PREFIX)/share/zsh/site-functions
+BASH_COMPLETIONS_DIR ?= $(PREFIX)/share/bash-completion/completions
+FISH_COMPLETIONS_DIR ?= $(PREFIX)/share/fish/vendor_completions.d
 
 help:
 	@echo "Sprout - Git Worktree Management Utility"
@@ -25,12 +28,19 @@ install:
 	@cp lib/hooks.sh $(PREFIX)/lib/hooks.sh
 	@cp lib/utils.sh $(PREFIX)/lib/utils.sh
 	@cp lib/commands/*.sh $(PREFIX)/lib/commands/
-	@echo "✓ Sprout installed successfully!"
+	@echo "Installing shell completions..."
+	@mkdir -p $(ZSH_COMPLETIONS_DIR)
+	@cp completions/_sprout $(ZSH_COMPLETIONS_DIR)/_sprout
+	@mkdir -p $(BASH_COMPLETIONS_DIR)
+	@cp completions/sprout.bash $(BASH_COMPLETIONS_DIR)/sprout
+	@mkdir -p $(FISH_COMPLETIONS_DIR)
+	@cp completions/sprout.fish $(FISH_COMPLETIONS_DIR)/sprout.fish
+	@echo "✓ Sprout installed successfully (with shell completions)!"
 	@echo ""
 	@echo "Next steps:"
 	@echo "  1. Make sure $(INSTALL_DIR) is in your PATH"
-	@echo "  2. Try: sprout help"
-	@echo "  3. Configure: sprout config set worktree_dir ~/.sprout"
+	@echo "  2. Restart your shell (or run: autoload -Uz compinit && compinit)"
+	@echo "  3. Try: sprout help"
 
 uninstall:
 	@if [ -f $(INSTALL_DIR)/sprout ]; then \
@@ -41,6 +51,9 @@ uninstall:
 	else \
 		echo "Sprout not found at $(INSTALL_DIR)/sprout"; \
 	fi
+	@rm -f $(ZSH_COMPLETIONS_DIR)/_sprout
+	@rm -f $(BASH_COMPLETIONS_DIR)/sprout
+	@rm -f $(FISH_COMPLETIONS_DIR)/sprout.fish
 
 test:
 	@echo "Running tests..."

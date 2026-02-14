@@ -9,6 +9,7 @@ Sprout is a bash utility that simplifies git worktree management. It provides a 
 - **Initialization hooks** - Run custom setup scripts when creating worktrees (e.g., copy `.env` files, install dependencies)
 - **Editor integration** - Open worktrees with your preferred editor
 - **Easy cleanup** - Remove worktrees with a simple command
+- **Shell completions** - Tab completion for zsh, bash, and fish
 
 ## Installation
 
@@ -211,6 +212,41 @@ npm run build
 ```
 
 Now every worktree will automatically have these set up!
+
+## Shell Completions
+
+Shell completions for **zsh**, **bash**, and **fish** are installed automatically with `make install`. They cover commands, worktree names, flags, config keys, and git branches.
+
+You may need to restart your shell after installation. For zsh, you can also run:
+
+```bash
+autoload -Uz compinit && compinit
+```
+
+### Manual Setup (without Makefile)
+
+**Zsh** - copy `completions/_sprout` to a directory in your `$fpath`:
+
+```bash
+mkdir -p ~/.zsh/completions
+cp completions/_sprout ~/.zsh/completions/
+# Add to ~/.zshrc:
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+**Bash** - source the completion script:
+
+```bash
+# Add to ~/.bashrc:
+source /path/to/sprout/completions/sprout.bash
+```
+
+**Fish** - copy to fish completions directory:
+
+```bash
+cp completions/sprout.fish ~/.config/fish/completions/
+```
 
 ## Troubleshooting
 
