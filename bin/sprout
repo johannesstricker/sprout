@@ -31,7 +31,7 @@ Usage: sprout <command> [options]
 Commands:
   add <name>          Create a new worktree
                       Options:
-                        -b <branch>   Checkout a specific branch (default: main)
+                        -b <branch>   Checkout a specific branch (default: repo default)
 
   dir <name>          Print the directory path of a worktree
 
@@ -47,7 +47,7 @@ Commands:
 
   start <name>        Create a new worktree and open it in the editor
                       Options:
-                        -b <branch>   Checkout a specific branch (default: main)
+                        -b <branch>   Checkout a specific branch (default: repo default)
                         -e <editor>   Use a specific editor
 
   config              Manage sprout configuration

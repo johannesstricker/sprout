@@ -280,6 +280,125 @@ test_list_with_slash() {
     [ "$count" -eq 3 ] && [ "$has_feat" = true ] && [ "$has_fix" = true ] && [ "$has_simple" = true ]
 }
 
+# Test: Start command creates worktree and opens editor
+test_start_creates_worktree() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # Create a test repo
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    # Create initial commit
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    # Get the actual default branch name (master or main)
+    local default_branch
+    default_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Initialize sprout config with a dummy editor (true always succeeds)
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+    set_config "editor" "true"
+
+    # Run start command with explicit branch
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" start "test-wt" -b "$default_branch" 2>&1)
+    local exit_code=$?
+
+    # Check worktree was created
+    local worktree_exists=false
+    if [[ -d "$temp_dir/worktrees/test-repo/test-wt" ]]; then
+        worktree_exists=true
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$worktree_exists" = true ]
+}
+
+# Test: Start command with -b flag
+test_start_with_branch() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # Create a test repo with a develop branch
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    git branch develop > /dev/null 2>&1
+
+    # Initialize sprout config
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+    set_config "editor" "true"
+
+    # Run start with -b flag
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" start "my-feature" -b develop 2>&1)
+    local exit_code=$?
+
+    # Check worktree was created
+    local worktree_exists=false
+    if [[ -d "$temp_dir/worktrees/test-repo/my-feature" ]]; then
+        worktree_exists=true
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$worktree_exists" = true ]
+}
+
+# Test: Start command fails without name
+test_start_missing_name() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+
+    # Run start without a name - should fail
+    "$PROJECT_ROOT/bin/sprout" start > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
 # Run all tests
 echo "Core Tests:"
 echo "-----------"
@@ -301,6 +420,13 @@ run_test "List command with no worktrees" "test_list_empty"
 run_test "List command output is sorted" "test_list_sorted"
 run_test "List command with --verbose flag" "test_list_verbose"
 run_test "List command with slash in worktree name" "test_list_with_slash"
+
+echo ""
+echo "Start Command Tests:"
+echo "--------------------"
+run_test "Start command creates worktree and opens editor" "test_start_creates_worktree"
+run_test "Start command with -b flag" "test_start_with_branch"
+run_test "Start command fails without name" "test_start_missing_name"
 
 echo ""
 echo "======================="

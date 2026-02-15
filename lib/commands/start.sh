@@ -4,10 +4,7 @@
 cmd_start() {
     local name=""
     local branch=""
-    local branch_specified=false
     local editor=""
-    local add_args=()
-    local open_args=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -18,7 +15,6 @@ cmd_start() {
                     return 1
                 fi
                 branch="$2"
-                branch_specified=true
                 shift 2
                 ;;
             -e|--editor)
@@ -53,8 +49,8 @@ cmd_start() {
     fi
 
     # Build args for add command
-    add_args=("$name")
-    if [[ "$branch_specified" == true ]]; then
+    local add_args=("$name")
+    if [[ -n "$branch" ]]; then
         add_args+=("-b" "$branch")
     fi
 
@@ -64,11 +60,14 @@ cmd_start() {
     fi
 
     # Build args for open command
-    open_args=("$name")
+    local open_args=("$name")
     if [[ -n "$editor" ]]; then
         open_args+=("-e" "$editor")
     fi
 
     # Open the worktree
-    cmd_open "${open_args[@]}"
+    if ! cmd_open "${open_args[@]}"; then
+        echo "Warning: Worktree created but failed to open. Use 'sprout open $name' to retry." >&2
+        return 1
+    fi
 }
