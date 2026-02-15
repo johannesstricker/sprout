@@ -44,7 +44,7 @@ sprout config show
 
 **Available configuration options:**
 - `worktree_dir` - Base directory for all worktrees (default: `~/.sprout`)
-- `editor` - Editor to use with `sprout open` command (default: `code`)
+- `editor` - Editor to use with `sprout open` and `sprout start` commands (default: `code`)
 
 ## Usage
 
@@ -71,6 +71,16 @@ sprout dir feature-x
 
 # Exit silently if the worktree doesn't exist (useful for scripts)
 sprout dir nonexistent
+```
+
+### Creating and Opening a Worktree
+
+```bash
+# Create a worktree and immediately open it in the editor
+sprout start feature-x
+
+# Create from a specific branch and open with a specific editor
+sprout start feature-x -b develop -e vim
 ```
 
 ### Opening a Worktree
@@ -171,20 +181,18 @@ sprout config set worktree_dir /path/to/worktrees
 # Navigate to your repository
 cd ~/projects/my-app
 
-# Create a new worktree for a feature
-sprout add feature-dark-mode
+# Create a new worktree and open it in your editor
+sprout start feature-dark-mode
 
-# The worktree is created and initialization hook runs (if present)
-# Output: Worktree created at ~/.sprout/my-app/feature-dark-mode
+# Or, if you prefer separate steps:
+sprout add feature-dark-mode
+sprout open feature-dark-mode
 
 # Get the path for scripting
 WORKTREE=$(sprout dir feature-dark-mode)
 cd $WORKTREE
 
 # Do your work...
-
-# Open the worktree in your editor
-sprout open feature-dark-mode
 
 # When done, remove the worktree
 sprout rm feature-dark-mode
