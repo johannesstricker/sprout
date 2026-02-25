@@ -48,7 +48,8 @@ test_libraries_exist() {
     [ -f "$PROJECT_ROOT/lib/commands/list.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/rm.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/open.sh" ] && \
-    [ -f "$PROJECT_ROOT/lib/commands/start.sh" ]
+    [ -f "$PROJECT_ROOT/lib/commands/start.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/checkout.sh" ]
 }
 
 # Test: Help command works
@@ -399,6 +400,153 @@ test_start_missing_name() {
     [ $exit_code -ne 0 ]
 }
 
+# Test: Checkout an existing local branch
+test_checkout_local_branch() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # Create a test repo
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    # Create initial commit
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    # Create a local branch
+    git branch develop > /dev/null 2>&1
+
+    # Initialize sprout config
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    # Run checkout
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" checkout develop 2>&1)
+    local exit_code=$?
+
+    # Verify worktree exists and branch is checked out
+    local worktree_exists=false
+    local correct_branch=false
+    if [[ -d "$temp_dir/worktrees/test-repo/develop" ]]; then
+        worktree_exists=true
+        local branch_name
+        branch_name=$(cd "$temp_dir/worktrees/test-repo/develop" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [[ "$branch_name" == "develop" ]]; then
+            correct_branch=true
+        fi
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$worktree_exists" = true ] && [ "$correct_branch" = true ]
+}
+
+# Test: Checkout a remote-only branch
+test_checkout_remote_only_branch() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # Create a bare remote repo
+    local bare_repo="$temp_dir/remote.git"
+    git init --bare "$bare_repo" > /dev/null 2>&1
+
+    # Create a local repo and push to the bare remote
+    local source_repo="$temp_dir/source-repo"
+    git init "$source_repo" > /dev/null 2>&1
+    cd "$source_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    git remote add origin "$bare_repo" > /dev/null 2>&1
+    git push origin HEAD > /dev/null 2>&1
+
+    # Create a branch and push it to remote only
+    git checkout -b feature-remote > /dev/null 2>&1
+    echo "feature" > feature.txt
+    git add feature.txt > /dev/null 2>&1
+    git commit -m "Feature commit" > /dev/null 2>&1
+    git push origin feature-remote > /dev/null 2>&1
+
+    # Clone the repo fresh (so feature-remote is remote-only)
+    local test_repo="$temp_dir/test-repo"
+    git clone "$bare_repo" "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    # Initialize sprout config
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    # Run checkout for the remote-only branch
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" checkout feature-remote 2>&1)
+    local exit_code=$?
+
+    # Verify worktree exists
+    local worktree_exists=false
+    local correct_branch=false
+    if [[ -d "$temp_dir/worktrees/test-repo/feature-remote" ]]; then
+        worktree_exists=true
+        local branch_name
+        branch_name=$(cd "$temp_dir/worktrees/test-repo/feature-remote" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [[ "$branch_name" == "feature-remote" ]]; then
+            correct_branch=true
+        fi
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$bare_repo" "$source_repo" "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$worktree_exists" = true ] && [ "$correct_branch" = true ]
+}
+
+# Test: Checkout fails for nonexistent branch
+test_checkout_fails_nonexistent() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+
+    # Run checkout for a branch that doesn't exist - should fail
+    "$PROJECT_ROOT/bin/sprout" checkout no-such-branch > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
 # Run all tests
 echo "Core Tests:"
 echo "-----------"
@@ -427,6 +575,13 @@ echo "--------------------"
 run_test "Start command creates worktree and opens editor" "test_start_creates_worktree"
 run_test "Start command with -b flag" "test_start_with_branch"
 run_test "Start command fails without name" "test_start_missing_name"
+
+echo ""
+echo "Checkout Command Tests:"
+echo "-----------------------"
+run_test "Checkout an existing local branch" "test_checkout_local_branch"
+run_test "Checkout a remote-only branch" "test_checkout_remote_only_branch"
+run_test "Checkout fails for nonexistent branch" "test_checkout_fails_nonexistent"
 
 echo ""
 echo "======================="

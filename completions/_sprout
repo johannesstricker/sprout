@@ -29,6 +29,7 @@ _sprout() {
         'rm:Remove a worktree'
         'open:Open a worktree with the configured editor'
         'start:Create a new worktree and open it in the editor'
+        'checkout:Checkout an existing branch into a new worktree'
         'config:Manage sprout configuration'
         'help:Show help message'
     )
@@ -70,6 +71,9 @@ _sprout() {
                         '1:name:' \
                         '-b[Checkout a specific branch]:branch:_sprout_branches' \
                         '(-e --editor)'{-e,--editor}'[Use specific editor]:editor:_command_names'
+                    ;;
+                checkout)
+                    _arguments '1:branch:_sprout_branches'
                     ;;
                 config)
                     local -a config_subcmds

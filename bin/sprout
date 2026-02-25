@@ -20,6 +20,7 @@ source "$LIB_DIR/commands/list.sh"
 source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
 source "$LIB_DIR/commands/start.sh"
+source "$LIB_DIR/commands/checkout.sh"
 
 # Display help message
 show_help() {
@@ -50,6 +51,8 @@ Commands:
                         -b <branch>   Checkout a specific branch (default: repo default)
                         -e <editor>   Use a specific editor
 
+  checkout <branch>   Checkout an existing branch into a new worktree
+
   config              Manage sprout configuration
                       Subcommands:
                         set <key> <value>   Set a configuration value
@@ -77,7 +80,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|list|rm|open|start|config|help|-h|--help|"")
+        add|dir|list|rm|open|start|checkout|config|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -113,6 +116,9 @@ main() {
             ;;
         start)
             cmd_start "$@"
+            ;;
+        checkout)
+            cmd_checkout "$@"
             ;;
         config)
             cmd_config "$@"

@@ -44,6 +44,7 @@ complete -c sprout -n __sprout_needs_command -a list -d 'List all worktrees'
 complete -c sprout -n __sprout_needs_command -a rm -d 'Remove a worktree'
 complete -c sprout -n __sprout_needs_command -a open -d 'Open a worktree with the configured editor'
 complete -c sprout -n __sprout_needs_command -a start -d 'Create a new worktree and open it in the editor'
+complete -c sprout -n __sprout_needs_command -a checkout -d 'Checkout an existing branch into a new worktree'
 complete -c sprout -n __sprout_needs_command -a config -d 'Manage sprout configuration'
 complete -c sprout -n __sprout_needs_command -a help -d 'Show help message'
 
@@ -65,6 +66,9 @@ complete -c sprout -n '__sprout_using_command rm' -s f -l force -d 'Force remova
 # open: worktree names + editor flag
 complete -c sprout -n '__sprout_using_command open' -a '(__sprout_worktrees)'
 complete -c sprout -n '__sprout_using_command open' -s e -l editor -d 'Use specific editor'
+
+# checkout: branch names
+complete -c sprout -n '__sprout_using_command checkout' -a '(__sprout_branches)'
 
 # start: -b <branch> + -e <editor>
 complete -c sprout -n '__sprout_using_command start' -s b -d 'Checkout a specific branch' -xa '(__sprout_branches)'
