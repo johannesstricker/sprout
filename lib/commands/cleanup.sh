@@ -75,7 +75,7 @@ cmd_cleanup() {
         branch=$(git -C "$worktree_path" rev-parse --abbrev-ref HEAD 2>/dev/null) || true
 
         echo "Removing worktree '$name'..."
-        if git worktree remove --force "$worktree_path" 2>/dev/null; then
+        if git worktree remove "$worktree_path" 2>/dev/null; then
             # Delete the branch if it still exists
             if [[ -n "$branch" ]] && [[ "$branch" != "$default_branch" ]]; then
                 if git rev-parse --verify "$branch" > /dev/null 2>&1; then
@@ -84,7 +84,7 @@ cmd_cleanup() {
             fi
             echo "  Removed worktree and branch '$branch'"
         else
-            echo "  Warning: Failed to remove worktree '$name'" >&2
+            echo "  Skipping '$name': worktree has uncommitted changes (use 'sprout rm -f $name' to force)" >&2
         fi
     done
 
