@@ -30,6 +30,7 @@ _sprout() {
         'open:Open a worktree with the configured editor'
         'start:Create a new worktree and open it in the editor'
         'checkout:Checkout an existing branch into a new worktree'
+        'cleanup:Remove worktrees whose branches have been merged'
         'config:Manage sprout configuration'
         'help:Show help message'
     )
@@ -74,6 +75,10 @@ _sprout() {
                     ;;
                 checkout)
                     _arguments '1:branch:_sprout_branches'
+                    ;;
+                cleanup)
+                    _arguments \
+                        '(-n --dry-run)'{-n,--dry-run}'[Show what would be removed]'
                     ;;
                 config)
                     local -a config_subcmds
