@@ -1,8 +1,20 @@
 #!/bin/bash
-# sprout cleanup command - Remove worktrees whose branches have been merged to main
+# sprout cleanup command - Remove worktrees whose branches have been merged to the default branch
 
 cmd_cleanup() {
     local dry_run=false
+    local worktrees_dir
+    local default_branch
+    local current_path=""
+    local current_branch=""
+    local -a to_remove=()
+    local -a to_remove_branches=()
+    local removed_count=0
+    local i
+    local name
+    local branch
+    local worktree_path
+    local remove_error
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -24,7 +36,6 @@ cmd_cleanup() {
         esac
     done
 
-    local worktrees_dir
     worktrees_dir=$(get_repo_worktrees_dir) || return 1
 
     # Check if worktrees directory exists
@@ -33,26 +44,33 @@ cmd_cleanup() {
         return 0
     fi
 
-    local default_branch
-    default_branch=$(get_default_branch)
+    default_branch=$(get_default_branch) || return 1
 
-    # Collect managed worktrees
-    local -a to_remove=()
-
+    # Collect managed worktrees whose branches have been merged into the default branch.
+    # Parse git worktree list --porcelain to get both path and branch in a single pass,
+    # avoiding a separate git subprocess per worktree.
     while IFS= read -r line; do
         if [[ "$line" =~ ^worktree\ (.+)$ ]]; then
-            local worktree_path="${BASH_REMATCH[1]}"
-            if [[ "$worktree_path" == "$worktrees_dir"/* ]]; then
-                # Get the branch checked out in this worktree
-                local branch
-                branch=$(git -C "$worktree_path" rev-parse --abbrev-ref HEAD 2>/dev/null) || continue
-
-                # Check if the branch has been merged into the default branch
-                if git merge-base --is-ancestor "$branch" "$default_branch" 2>/dev/null; then
-                    local name="${worktree_path#"$worktrees_dir/"}"
-                    to_remove+=("$name")
+            current_path="${BASH_REMATCH[1]}"
+            current_branch=""
+        elif [[ "$line" =~ ^branch\ refs/heads/(.+)$ ]]; then
+            current_branch="${BASH_REMATCH[1]}"
+        elif [[ "$line" == "detached" ]]; then
+            current_branch="HEAD"
+        elif [[ -z "$line" ]] && [[ -n "$current_path" ]]; then
+            # End of a worktree block — check if it should be removed.
+            # Skip: worktrees outside the managed dir, detached HEAD, or on the default branch itself.
+            if [[ "$current_path" == "$worktrees_dir"/* ]] && \
+               [[ -n "$current_branch" ]] && \
+               [[ "$current_branch" != "HEAD" ]] && \
+               [[ "$current_branch" != "$default_branch" ]]; then
+                if git merge-base --is-ancestor "$current_branch" "$default_branch" 2>/dev/null; then
+                    to_remove+=("${current_path#"$worktrees_dir/"}")
+                    to_remove_branches+=("$current_branch")
                 fi
             fi
+            current_path=""
+            current_branch=""
         fi
     done < <(git worktree list --porcelain)
 
@@ -69,13 +87,13 @@ cmd_cleanup() {
         return 0
     fi
 
-    for name in "${to_remove[@]}"; do
-        local worktree_path="${worktrees_dir}/${name}"
-        local branch
-        branch=$(git -C "$worktree_path" rev-parse --abbrev-ref HEAD 2>/dev/null) || true
+    for i in "${!to_remove[@]}"; do
+        name="${to_remove[$i]}"
+        branch="${to_remove_branches[$i]}"
+        worktree_path="${worktrees_dir}/${name}"
 
         echo "Removing worktree '$name'..."
-        if git worktree remove "$worktree_path" 2>/dev/null; then
+        if remove_error=$(git worktree remove "$worktree_path" 2>&1); then
             # Delete the branch if it still exists
             if [[ -n "$branch" ]] && [[ "$branch" != "$default_branch" ]]; then
                 if git rev-parse --verify "$branch" > /dev/null 2>&1; then
@@ -83,8 +101,9 @@ cmd_cleanup() {
                 fi
             fi
             echo "  Removed worktree and branch '$branch'"
+            ((removed_count++))
         else
-            echo "  Skipping '$name': worktree has uncommitted changes (use 'sprout rm -f $name' to force)" >&2
+            echo "  Skipping '$name': $remove_error (use 'sprout rm -f $name' to force)" >&2
         fi
     done
 
@@ -93,5 +112,5 @@ cmd_cleanup() {
         rmdir "$worktrees_dir" 2>/dev/null || true
     fi
 
-    echo "Cleanup complete: removed ${#to_remove[@]} worktree(s)"
+    echo "Cleanup complete: removed ${removed_count} worktree(s)"
 }

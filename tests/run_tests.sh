@@ -763,7 +763,49 @@ test_cleanup_skips_dirty_worktree() {
     rm -rf "$test_repo" "$temp_dir/worktrees"
     rm -rf "$temp_dir"
 
-    [ "$still_exists" = true ]
+    [ $exit_code -eq 0 ] && [ "$still_exists" = true ]
+}
+
+# Test: Cleanup skips worktrees with detached HEAD
+test_cleanup_skips_detached_head() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init -b main "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    # Create a worktree in detached HEAD state
+    local wt_path="$temp_dir/worktrees/test-repo/detached-wt"
+    mkdir -p "$(dirname "$wt_path")"
+    git worktree add --detach "$wt_path" > /dev/null 2>&1
+
+    # Run cleanup
+    "$PROJECT_ROOT/bin/sprout" cleanup > /dev/null 2>&1
+    local exit_code=$?
+
+    # Verify detached worktree was NOT removed
+    local still_exists=false
+    if [[ -d "$wt_path" ]]; then
+        still_exists=true
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$still_exists" = true ]
 }
 
 # Test: Cleanup deletes the local branch after removing worktree
@@ -856,6 +898,7 @@ run_test "Cleanup keeps unmerged worktrees" "test_cleanup_keeps_unmerged"
 run_test "Cleanup with no worktrees" "test_cleanup_no_worktrees"
 run_test "Cleanup --dry-run does not remove anything" "test_cleanup_dry_run"
 run_test "Cleanup skips worktrees with uncommitted changes" "test_cleanup_skips_dirty_worktree"
+run_test "Cleanup skips worktrees with detached HEAD" "test_cleanup_skips_detached_head"
 run_test "Cleanup deletes the local branch" "test_cleanup_deletes_branch"
 
 echo ""
