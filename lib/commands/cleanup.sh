@@ -10,11 +10,13 @@ cmd_cleanup() {
     local -a to_remove=()
     local -a to_remove_branches=()
     local removed_count=0
+    local skipped_count=0
     local i
     local name
     local branch
     local worktree_path
     local remove_error
+    local branch_deleted
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -95,15 +97,23 @@ cmd_cleanup() {
         echo "Removing worktree '$name'..."
         if remove_error=$(git worktree remove "$worktree_path" 2>&1); then
             # Delete the branch if it still exists
+            branch_deleted=false
             if [[ -n "$branch" ]] && [[ "$branch" != "$default_branch" ]]; then
                 if git rev-parse --verify "$branch" > /dev/null 2>&1; then
-                    git branch -d "$branch" 2>/dev/null || true
+                    if git branch -d "$branch" 2>/dev/null; then
+                        branch_deleted=true
+                    fi
                 fi
             fi
-            echo "  Removed worktree and branch '$branch'"
+            if [[ "$branch_deleted" == true ]]; then
+                echo "  Removed worktree and branch '$branch'"
+            else
+                echo "  Removed worktree '$name' (branch '$branch' could not be deleted)"
+            fi
             ((removed_count++))
         else
             echo "  Skipping '$name': $remove_error (use 'sprout rm -f $name' to force)" >&2
+            ((skipped_count++))
         fi
     done
 
@@ -113,4 +123,7 @@ cmd_cleanup() {
     fi
 
     echo "Cleanup complete: removed ${removed_count} worktree(s)"
+    if [[ $skipped_count -gt 0 ]]; then
+        return 1
+    fi
 }

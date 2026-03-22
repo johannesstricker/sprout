@@ -596,6 +596,62 @@ test_cleanup_removes_merged() {
     [ $exit_code -eq 0 ] && [ "$existed_before" = true ] && [ "$removed" = true ]
 }
 
+# Test: Cleanup removes worktree whose branch was actually merged (not just at same commit)
+test_cleanup_removes_actually_merged() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init -b main "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    # Initialize sprout config
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    # Create a feature branch with a commit, then merge it into main
+    git checkout -b "feature-merged" > /dev/null 2>&1
+    echo "feature work" > feature.txt
+    git add feature.txt > /dev/null 2>&1
+    git commit -m "Feature work" > /dev/null 2>&1
+    git checkout main > /dev/null 2>&1
+    git merge "feature-merged" --no-ff -m "Merge feature-merged" > /dev/null 2>&1
+
+    # Create a worktree for the now-merged feature branch
+    "$PROJECT_ROOT/bin/sprout" checkout "feature-merged" > /dev/null 2>&1 || true
+    local wt_path="$temp_dir/worktrees/test-repo/feature-merged"
+
+    # Verify worktree exists before cleanup
+    local existed_before=false
+    if [[ -d "$wt_path" ]]; then
+        existed_before=true
+    fi
+
+    # Run cleanup
+    "$PROJECT_ROOT/bin/sprout" cleanup > /dev/null 2>&1
+    local exit_code=$?
+
+    # Verify worktree was removed
+    local removed=false
+    if [[ ! -d "$wt_path" ]]; then
+        removed=true
+    fi
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$existed_before" = true ] && [ "$removed" = true ]
+}
+
 # Test: Cleanup keeps unmerged worktrees
 test_cleanup_keeps_unmerged() {
     local temp_dir=$(mktemp -d)
@@ -763,7 +819,7 @@ test_cleanup_skips_dirty_worktree() {
     rm -rf "$test_repo" "$temp_dir/worktrees"
     rm -rf "$temp_dir"
 
-    [ $exit_code -eq 0 ] && [ "$still_exists" = true ]
+    [ $exit_code -ne 0 ] && [ "$still_exists" = true ]
 }
 
 # Test: Cleanup skips worktrees with detached HEAD
@@ -894,6 +950,7 @@ echo ""
 echo "Cleanup Command Tests:"
 echo "----------------------"
 run_test "Cleanup removes merged worktrees" "test_cleanup_removes_merged"
+run_test "Cleanup removes actually merged worktrees (with commits)" "test_cleanup_removes_actually_merged"
 run_test "Cleanup keeps unmerged worktrees" "test_cleanup_keeps_unmerged"
 run_test "Cleanup with no worktrees" "test_cleanup_no_worktrees"
 run_test "Cleanup --dry-run does not remove anything" "test_cleanup_dry_run"
