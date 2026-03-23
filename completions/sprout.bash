@@ -4,7 +4,7 @@ _sprout() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="add dir list rm open start checkout config help"
+    local commands="add dir list rm open start checkout cleanup config help"
     local config_subcmds="set get show"
     local config_keys="worktree_dir editor"
 
@@ -101,6 +101,11 @@ _sprout() {
             local branches
             branches=$(git branch -a --format='%(refname:short)' 2>/dev/null | sed 's|^origin/||' | sort -u)
             COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+            ;;
+        cleanup)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=($(compgen -W "-n --dry-run" -- "$cur"))
+            fi
             ;;
         config)
             if [[ $cword -eq 2 ]]; then

@@ -21,6 +21,7 @@ source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
 source "$LIB_DIR/commands/start.sh"
 source "$LIB_DIR/commands/checkout.sh"
+source "$LIB_DIR/commands/cleanup.sh"
 
 # Display help message
 show_help() {
@@ -53,6 +54,10 @@ Commands:
 
   checkout <branch>   Checkout an existing branch into a new worktree
 
+  cleanup             Remove worktrees whose branches have been merged
+                      Options:
+                        -n, --dry-run   Show what would be removed without removing
+
   config              Manage sprout configuration
                       Subcommands:
                         set <key> <value>   Set a configuration value
@@ -80,7 +85,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|list|rm|open|start|checkout|config|help|-h|--help|"")
+        add|dir|list|rm|open|start|checkout|cleanup|config|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -119,6 +124,9 @@ main() {
             ;;
         checkout)
             cmd_checkout "$@"
+            ;;
+        cleanup)
+            cmd_cleanup "$@"
             ;;
         config)
             cmd_config "$@"
