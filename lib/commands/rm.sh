@@ -35,20 +35,29 @@ cmd_rm() {
         return 1
     fi
 
-    # Check if worktree exists
+    # Resolve the expected worktree path
     local worktree_path
     worktree_path=$(get_worktree_path "$name") || return 1
 
-    if [[ ! -d "$worktree_path" ]]; then
+    local dir_exists=false
+    [[ -d "$worktree_path" ]] && dir_exists=true
+
+    # Check if git still has this worktree registered, even if the directory
+    # has been deleted out from under it (orphaned registration).
+    local registered=false
+    if git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $worktree_path"; then
+        registered=true
+    fi
+
+    if [[ "$dir_exists" == false && "$registered" == false ]]; then
         echo "Error: Worktree '$name' does not exist" >&2
         return 1
     fi
 
-    # Check if it's a git worktree
-    if is_git_worktree "$worktree_path"; then
-        echo "Removing worktree '$name'..."
+    echo "Removing worktree '$name'..."
 
-        # Remove the git worktree
+    if [[ "$dir_exists" == true && "$registered" == true ]]; then
+        # Normal case: directory exists and git knows about it
         if [[ "$force" == true ]]; then
             if ! git worktree remove --force "$worktree_path"; then
                 echo "Error: Failed to remove git worktree (with --force)" >&2
@@ -61,9 +70,22 @@ cmd_rm() {
                 return 1
             fi
         fi
+    elif [[ "$registered" == true ]]; then
+        # Orphaned registration: directory was deleted but git still tracks it.
+        # Prune to drop the stale admin entry under .git/worktrees.
+        echo "Worktree directory missing; pruning orphaned registration..."
+        if ! git worktree prune 2>/dev/null; then
+            echo "Error: Failed to prune git worktree registration" >&2
+            return 1
+        fi
     else
-        # If it's not registered as a git worktree, just remove the directory
+        # Orphaned directory: not registered with git
         echo "Warning: Worktree not registered with git, removing directory anyway..."
+    fi
+
+    # Remove any leftover directory (e.g. when --force leaves it, or it was
+    # never registered to begin with).
+    if [[ -d "$worktree_path" ]]; then
         rm -rf "$worktree_path"
     fi
 
