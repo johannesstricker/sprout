@@ -35,35 +35,60 @@ cmd_rm() {
         return 1
     fi
 
-    # Check if worktree exists
+    # Resolve the expected worktree path
     local worktree_path
     worktree_path=$(get_worktree_path "$name") || return 1
 
-    if [[ ! -d "$worktree_path" ]]; then
+    local dir_exists=false
+    [[ -d "$worktree_path" ]] && dir_exists=true
+
+    # Check if git still has this worktree registered, even if the directory
+    # has been deleted out from under it (orphaned registration).
+    local registered=false
+    if git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $worktree_path"; then
+        registered=true
+    fi
+
+    if [[ "$dir_exists" == false && "$registered" == false ]]; then
         echo "Error: Worktree '$name' does not exist" >&2
         return 1
     fi
 
-    # Check if it's a git worktree
-    if is_git_worktree "$worktree_path"; then
-        echo "Removing worktree '$name'..."
+    echo "Removing worktree '$name'..."
 
-        # Remove the git worktree
+    if [[ "$dir_exists" == true && "$registered" == true ]]; then
+        # Normal case: directory exists and git knows about it
+        local remove_output
         if [[ "$force" == true ]]; then
-            if ! git worktree remove --force "$worktree_path"; then
-                echo "Error: Failed to remove git worktree (with --force)" >&2
+            if ! remove_output=$(git worktree remove --force "$worktree_path" 2>&1); then
+                echo "Error: Failed to remove git worktree (with --force): $remove_output" >&2
                 return 1
             fi
         else
-            if ! git worktree remove "$worktree_path"; then
-                echo "Error: Failed to remove git worktree" >&2
+            if ! remove_output=$(git worktree remove "$worktree_path" 2>&1); then
+                echo "Error: Failed to remove git worktree: $remove_output" >&2
                 echo "Use -f flag to force removal" >&2
                 return 1
             fi
         fi
+    elif [[ "$registered" == true ]]; then
+        # Orphaned registration: directory was deleted but git still tracks it.
+        # The directory is gone so there's no dirty content to protect; --force
+        # is required because git refuses removal when the path is missing.
+        echo "Worktree directory missing; removing orphaned registration..."
+        local remove_output
+        if ! remove_output=$(git worktree remove --force "$worktree_path" 2>&1); then
+            echo "Error: Failed to remove git worktree registration: $remove_output" >&2
+            return 1
+        fi
     else
-        # If it's not registered as a git worktree, just remove the directory
+        # Orphaned directory: not registered with git
         echo "Warning: Worktree not registered with git, removing directory anyway..."
+    fi
+
+    # Safety net: remove any leftover directory in case git worktree remove did
+    # not fully clean up, or for directories that were never registered with git.
+    if [[ -d "$worktree_path" ]]; then
         rm -rf "$worktree_path"
     fi
 
