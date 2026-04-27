@@ -58,24 +58,27 @@ cmd_rm() {
 
     if [[ "$dir_exists" == true && "$registered" == true ]]; then
         # Normal case: directory exists and git knows about it
+        local remove_output
         if [[ "$force" == true ]]; then
-            if ! git worktree remove --force "$worktree_path"; then
-                echo "Error: Failed to remove git worktree (with --force)" >&2
+            if ! remove_output=$(git worktree remove --force "$worktree_path" 2>&1); then
+                echo "Error: Failed to remove git worktree (with --force): $remove_output" >&2
                 return 1
             fi
         else
-            if ! git worktree remove "$worktree_path"; then
-                echo "Error: Failed to remove git worktree" >&2
+            if ! remove_output=$(git worktree remove "$worktree_path" 2>&1); then
+                echo "Error: Failed to remove git worktree: $remove_output" >&2
                 echo "Use -f flag to force removal" >&2
                 return 1
             fi
         fi
     elif [[ "$registered" == true ]]; then
         # Orphaned registration: directory was deleted but git still tracks it.
-        # Prune to drop the stale admin entry under .git/worktrees.
-        echo "Worktree directory missing; pruning orphaned registration..."
-        if ! git worktree prune 2>/dev/null; then
-            echo "Error: Failed to prune git worktree registration" >&2
+        # git worktree remove handles missing directories (git 2.17+), targeting
+        # only this worktree rather than pruning all stale registrations globally.
+        echo "Worktree directory missing; removing orphaned registration..."
+        local remove_output
+        if ! remove_output=$(git worktree remove "$worktree_path" 2>&1); then
+            echo "Error: Failed to remove git worktree registration: $remove_output" >&2
             return 1
         fi
     else
@@ -83,8 +86,8 @@ cmd_rm() {
         echo "Warning: Worktree not registered with git, removing directory anyway..."
     fi
 
-    # Remove any leftover directory (e.g. when --force leaves it, or it was
-    # never registered to begin with).
+    # Safety net: remove any leftover directory in case git worktree remove did
+    # not fully clean up, or for directories that were never registered with git.
     if [[ -d "$worktree_path" ]]; then
         rm -rf "$worktree_path"
     fi

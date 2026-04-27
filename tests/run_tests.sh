@@ -910,17 +910,17 @@ test_cleanup_deletes_branch() {
     [ "$branch_existed_before" = true ] && [ "$branch_deleted" = true ]
 }
 
-# Test: Rm command removes a normal worktree
-test_rm_removes_worktree() {
-    local temp_dir=$(mktemp -d)
-    export HOME="$temp_dir"
-
+# Shared setup helper for rm tests: initialises a git repo with an initial
+# commit and configures sprout's worktree_dir. Leaves the caller's working
+# directory set to the newly created test repo.
+setup_rm_test_repo() {
+    local temp_dir="$1"
     local test_repo="$temp_dir/test-repo"
+
     git init -b main "$test_repo" > /dev/null 2>&1
     cd "$test_repo"
     git config user.name "Test User" > /dev/null 2>&1
     git config user.email "test@test.com" > /dev/null 2>&1
-
     echo "test" > README.md
     git add README.md > /dev/null 2>&1
     git commit -m "Initial commit" > /dev/null 2>&1
@@ -928,6 +928,13 @@ test_rm_removes_worktree() {
     source "$PROJECT_ROOT/lib/config.sh"
     init_config > /dev/null 2>&1
     set_config "worktree_dir" "$temp_dir/worktrees"
+}
+
+# Test: Rm command removes a normal worktree
+test_rm_removes_worktree() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_rm_test_repo "$temp_dir"
 
     "$PROJECT_ROOT/bin/sprout" add "to-remove" > /dev/null 2>&1
 
@@ -945,8 +952,7 @@ test_rm_removes_worktree() {
     fi
 
     cd "$temp_dir"
-    rm -rf "$test_repo" "$temp_dir/worktrees"
-    rm -rf "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees" "$temp_dir"
 
     [ $exit_code -eq 0 ] && [ "$removed" = true ] && [ "$in_list" = false ]
 }
@@ -955,20 +961,7 @@ test_rm_removes_worktree() {
 test_rm_cleans_orphaned_registration() {
     local temp_dir=$(mktemp -d)
     export HOME="$temp_dir"
-
-    local test_repo="$temp_dir/test-repo"
-    git init -b main "$test_repo" > /dev/null 2>&1
-    cd "$test_repo"
-    git config user.name "Test User" > /dev/null 2>&1
-    git config user.email "test@test.com" > /dev/null 2>&1
-
-    echo "test" > README.md
-    git add README.md > /dev/null 2>&1
-    git commit -m "Initial commit" > /dev/null 2>&1
-
-    source "$PROJECT_ROOT/lib/config.sh"
-    init_config > /dev/null 2>&1
-    set_config "worktree_dir" "$temp_dir/worktrees"
+    setup_rm_test_repo "$temp_dir"
 
     # Create a worktree, then delete its directory directly to simulate the
     # orphaned-registration state: sprout list still shows it but the dir is gone.
@@ -992,8 +985,7 @@ test_rm_cleans_orphaned_registration() {
     fi
 
     cd "$temp_dir"
-    rm -rf "$test_repo" "$temp_dir/worktrees"
-    rm -rf "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees" "$temp_dir"
 
     [ "$listed_before" = true ] && [ $exit_code -eq 0 ] && [ "$listed_after" = false ]
 }
@@ -1002,20 +994,7 @@ test_rm_cleans_orphaned_registration() {
 test_rm_removes_orphaned_directory() {
     local temp_dir=$(mktemp -d)
     export HOME="$temp_dir"
-
-    local test_repo="$temp_dir/test-repo"
-    git init -b main "$test_repo" > /dev/null 2>&1
-    cd "$test_repo"
-    git config user.name "Test User" > /dev/null 2>&1
-    git config user.email "test@test.com" > /dev/null 2>&1
-
-    echo "test" > README.md
-    git add README.md > /dev/null 2>&1
-    git commit -m "Initial commit" > /dev/null 2>&1
-
-    source "$PROJECT_ROOT/lib/config.sh"
-    init_config > /dev/null 2>&1
-    set_config "worktree_dir" "$temp_dir/worktrees"
+    setup_rm_test_repo "$temp_dir"
 
     # Create a stray directory in the worktrees location that isn't a git worktree
     local stray="$temp_dir/worktrees/test-repo/stray"
@@ -1031,8 +1010,7 @@ test_rm_removes_orphaned_directory() {
     fi
 
     cd "$temp_dir"
-    rm -rf "$test_repo" "$temp_dir/worktrees"
-    rm -rf "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees" "$temp_dir"
 
     [ $exit_code -eq 0 ] && [ "$removed" = true ]
 }
@@ -1041,29 +1019,50 @@ test_rm_removes_orphaned_directory() {
 test_rm_fails_when_missing() {
     local temp_dir=$(mktemp -d)
     export HOME="$temp_dir"
-
-    local test_repo="$temp_dir/test-repo"
-    git init -b main "$test_repo" > /dev/null 2>&1
-    cd "$test_repo"
-    git config user.name "Test User" > /dev/null 2>&1
-    git config user.email "test@test.com" > /dev/null 2>&1
-
-    echo "test" > README.md
-    git add README.md > /dev/null 2>&1
-    git commit -m "Initial commit" > /dev/null 2>&1
-
-    source "$PROJECT_ROOT/lib/config.sh"
-    init_config > /dev/null 2>&1
-    set_config "worktree_dir" "$temp_dir/worktrees"
+    setup_rm_test_repo "$temp_dir"
 
     "$PROJECT_ROOT/bin/sprout" rm "nonexistent" > /dev/null 2>&1
     local exit_code=$?
 
     cd "$temp_dir"
-    rm -rf "$test_repo"
-    rm -rf "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir"
 
     [ $exit_code -ne 0 ]
+}
+
+# Test: Rm without -f fails on a worktree with uncommitted changes; -f succeeds
+test_rm_force_with_uncommitted_changes() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_rm_test_repo "$temp_dir"
+
+    "$PROJECT_ROOT/bin/sprout" add "dirty-wt" > /dev/null 2>&1
+    local wt_path="$temp_dir/worktrees/test-repo/dirty-wt"
+    echo "uncommitted change" > "$wt_path/dirty.txt"
+
+    # Without -f, rm should refuse to remove a dirty worktree
+    "$PROJECT_ROOT/bin/sprout" rm "dirty-wt" > /dev/null 2>&1
+    local exit_code_no_force=$?
+
+    local still_exists=false
+    if [[ -d "$wt_path" ]]; then
+        still_exists=true
+    fi
+
+    # With -f, rm should succeed
+    "$PROJECT_ROOT/bin/sprout" rm -f "dirty-wt" > /dev/null 2>&1
+    local exit_code_force=$?
+
+    local removed=false
+    if [[ ! -d "$wt_path" ]]; then
+        removed=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees" "$temp_dir"
+
+    [ $exit_code_no_force -ne 0 ] && [ "$still_exists" = true ] && \
+        [ $exit_code_force -eq 0 ] && [ "$removed" = true ]
 }
 
 # Run all tests
@@ -1121,6 +1120,7 @@ run_test "Rm removes a normal worktree" "test_rm_removes_worktree"
 run_test "Rm cleans up orphaned git registration" "test_rm_cleans_orphaned_registration"
 run_test "Rm removes an orphaned directory not registered with git" "test_rm_removes_orphaned_directory"
 run_test "Rm fails when worktree does not exist" "test_rm_fails_when_missing"
+run_test "Rm without -f fails on dirty worktree; -f succeeds" "test_rm_force_with_uncommitted_changes"
 
 echo ""
 echo "======================="

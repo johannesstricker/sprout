@@ -81,19 +81,3 @@ validate_branch() {
     echo "Error: Branch '$branch' not found" >&2
     return 1
 }
-
-# Check if worktree is already registered with git
-is_git_worktree() {
-    local path="$1"
-
-    if [[ ! -d "$path" ]]; then
-        return 1
-    fi
-
-    # Check if the path is a valid git worktree
-    if git worktree list | grep -q "^$path"; then
-        return 0
-    fi
-
-    return 1
-}
