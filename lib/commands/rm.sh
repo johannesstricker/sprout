@@ -73,11 +73,11 @@ cmd_rm() {
         fi
     elif [[ "$registered" == true ]]; then
         # Orphaned registration: directory was deleted but git still tracks it.
-        # git worktree remove handles missing directories (git 2.17+), targeting
-        # only this worktree rather than pruning all stale registrations globally.
+        # The directory is gone so there's no dirty content to protect; --force
+        # is required because git refuses removal when the path is missing.
         echo "Worktree directory missing; removing orphaned registration..."
         local remove_output
-        if ! remove_output=$(git worktree remove "$worktree_path" 2>&1); then
+        if ! remove_output=$(git worktree remove --force "$worktree_path" 2>&1); then
             echo "Error: Failed to remove git worktree registration: $remove_output" >&2
             return 1
         fi
