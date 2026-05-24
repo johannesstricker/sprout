@@ -68,10 +68,11 @@ cmd_checkout() {
 
     echo "Worktree created successfully at: $worktree_path"
 
-    # Run init hook if it exists
-    echo "Checking for initialization hook..."
-    if run_init_hook "$worktree_path"; then
-        echo "Initialization hook executed successfully"
+    # Run init hook if it exists. Hook failures propagate so the user knows
+    # their worktree is not fully set up.
+    if ! run_init_hook "$worktree_path"; then
+        echo "Error: Initialization hook failed" >&2
+        return 1
     fi
 
     return 0

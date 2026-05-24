@@ -1,0 +1,16 @@
+# Example .sprout/init.yaml for a Node.js project.
+#
+# Copy this file to .sprout/init.yaml in your repository to use it.
+# Requires `yq` and `jq` to be installed.
+
+copy:
+  - src: .env
+    optional: true
+  - src: .env.local
+    optional: true
+
+run:
+  - npm ci
+  - cmd: npm run prepare
+    allow_failure: true
+    name: "Setup husky hooks"

@@ -1065,6 +1065,346 @@ test_rm_force_with_uncommitted_changes() {
         [ $exit_code_force -eq 0 ] && [ "$removed" = true ]
 }
 
+# Shared setup helper for hook tests: initialises a git repo with an initial
+# commit and configures sprout's worktree_dir. Leaves the caller's working
+# directory set to the newly created test repo.
+setup_hook_test_repo() {
+    local temp_dir="$1"
+    local test_repo="$temp_dir/test-repo"
+
+    git init -b main "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+}
+
+# Test: YAML hook copies a file with shorthand entry
+test_yaml_hook_copy_shorthand() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    echo "SECRET=42" > .env
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+copy:
+  - .env
+EOF
+    git add .env .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add env and hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local copied=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/.env" ]] && \
+       grep -q "SECRET=42" "$temp_dir/worktrees/test-repo/wt1/.env"; then
+        copied=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$copied" = true ]
+}
+
+# Test: YAML hook copies a file with explicit src/dest
+test_yaml_hook_copy_explicit_dest() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    echo "TOKEN=abc" > secrets.txt
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+copy:
+  - src: secrets.txt
+    dest: config/secrets.txt
+EOF
+    git add secrets.txt .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add secrets and hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local copied=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/config/secrets.txt" ]] && \
+       grep -q "TOKEN=abc" "$temp_dir/worktrees/test-repo/wt1/config/secrets.txt"; then
+        copied=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$copied" = true ]
+}
+
+# Test: optional: true silently skips a missing source
+test_yaml_hook_copy_optional_missing() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+copy:
+  - src: does-not-exist
+    optional: true
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local created=false
+    if [[ -d "$temp_dir/worktrees/test-repo/wt1" ]]; then
+        created=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$created" = true ]
+}
+
+# Test: missing required source aborts the hook
+test_yaml_hook_copy_missing_required() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+copy:
+  - src: does-not-exist
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    # add should report the hook failure
+    [ $exit_code -ne 0 ]
+}
+
+# Test: glob source copies multiple files
+test_yaml_hook_copy_glob() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p config
+    echo "a" > config/a.local.json
+    echo "b" > config/b.local.json
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+copy:
+  - src: "config/*.local.json"
+EOF
+    git add config .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add configs and hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local both_copied=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/config/a.local.json" ]] && \
+       [[ -f "$temp_dir/worktrees/test-repo/wt1/config/b.local.json" ]]; then
+        both_copied=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$both_copied" = true ]
+}
+
+# Test: run section executes commands in the worktree
+test_yaml_hook_run_command() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+run:
+  - echo hello > marker.txt
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local ran=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/marker.txt" ]] && \
+       grep -q "hello" "$temp_dir/worktrees/test-repo/wt1/marker.txt"; then
+        ran=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$ran" = true ]
+}
+
+# Test: a failing command aborts the hook by default
+test_yaml_hook_run_failure_aborts() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+run:
+  - false
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
+# Test: allow_failure: true lets a failing command continue
+test_yaml_hook_run_allow_failure() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+run:
+  - cmd: false
+    allow_failure: true
+  - echo ok > marker.txt
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local marker_exists=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/marker.txt" ]]; then
+        marker_exists=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$marker_exists" = true ]
+}
+
+# Test: env vars are exported into run commands
+test_yaml_hook_run_env_vars() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+run:
+  - echo "$SPROUT_WORKTREE_NAME" > name.txt
+EOF
+    git add .sprout/init.yaml > /dev/null 2>&1
+    git commit -m "Add hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local name_match=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/name.txt" ]] && \
+       grep -q "^wt1$" "$temp_dir/worktrees/test-repo/wt1/name.txt"; then
+        name_match=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$name_match" = true ]
+}
+
+# Test: when both init.yaml and init exist, init.yaml wins
+test_yaml_hook_takes_priority_over_sh() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init.yaml <<'EOF'
+run:
+  - echo yaml > which.txt
+EOF
+    cat > .sprout/init <<'EOF'
+#!/bin/bash
+echo sh > which.txt
+EOF
+    chmod +x .sprout/init
+    git add .sprout/init.yaml .sprout/init > /dev/null 2>&1
+    git commit -m "Add both hooks" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+
+    local picked_yaml=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/which.txt" ]] && \
+       grep -q "^yaml$" "$temp_dir/worktrees/test-repo/wt1/which.txt"; then
+        picked_yaml=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ "$picked_yaml" = true ]
+}
+
+# Test: legacy executable bash hook still works when no YAML hook is present
+test_legacy_sh_hook_still_works() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+    setup_hook_test_repo "$temp_dir"
+
+    mkdir -p .sprout
+    cat > .sprout/init <<'EOF'
+#!/bin/bash
+echo "$SPROUT_WORKTREE_NAME" > legacy.txt
+EOF
+    chmod +x .sprout/init
+    git add .sprout/init > /dev/null 2>&1
+    git commit -m "Add legacy hook" > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" add "wt1" > /dev/null 2>&1
+    local exit_code=$?
+
+    local ran=false
+    if [[ -f "$temp_dir/worktrees/test-repo/wt1/legacy.txt" ]] && \
+       grep -q "^wt1$" "$temp_dir/worktrees/test-repo/wt1/legacy.txt"; then
+        ran=true
+    fi
+
+    cd "$temp_dir"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$ran" = true ]
+}
+
 # Run all tests
 echo "Core Tests:"
 echo "-----------"
@@ -1121,6 +1461,21 @@ run_test "Rm cleans up orphaned git registration" "test_rm_cleans_orphaned_regis
 run_test "Rm removes an orphaned directory not registered with git" "test_rm_removes_orphaned_directory"
 run_test "Rm fails when worktree does not exist" "test_rm_fails_when_missing"
 run_test "Rm without -f fails on dirty worktree; -f succeeds" "test_rm_force_with_uncommitted_changes"
+
+echo ""
+echo "Init Hook (YAML) Tests:"
+echo "-----------------------"
+run_test "YAML hook: shorthand copy entry" "test_yaml_hook_copy_shorthand"
+run_test "YAML hook: explicit src/dest copy" "test_yaml_hook_copy_explicit_dest"
+run_test "YAML hook: optional missing src is skipped" "test_yaml_hook_copy_optional_missing"
+run_test "YAML hook: required missing src aborts" "test_yaml_hook_copy_missing_required"
+run_test "YAML hook: glob src copies multiple files" "test_yaml_hook_copy_glob"
+run_test "YAML hook: run executes command in worktree" "test_yaml_hook_run_command"
+run_test "YAML hook: failing run aborts by default" "test_yaml_hook_run_failure_aborts"
+run_test "YAML hook: allow_failure lets pipeline continue" "test_yaml_hook_run_allow_failure"
+run_test "YAML hook: SPROUT_* env vars available to run" "test_yaml_hook_run_env_vars"
+run_test "YAML hook takes priority over legacy bash hook" "test_yaml_hook_takes_priority_over_sh"
+run_test "Legacy bash hook still works when no YAML present" "test_legacy_sh_hook_still_works"
 
 echo ""
 echo "======================="

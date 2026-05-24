@@ -1,0 +1,18 @@
+# Example .sprout/init.yaml for a Python project.
+#
+# Copy this file to .sprout/init.yaml in your repository to use it.
+# Requires `yq` and `jq` to be installed.
+
+copy:
+  - src: .env
+    optional: true
+  - src: .env.local
+    optional: true
+
+run:
+  - cmd: python -m venv venv
+    name: "Create virtualenv"
+  - cmd: ./venv/bin/pip install --upgrade pip setuptools wheel
+    name: "Upgrade pip toolchain"
+  - cmd: ./venv/bin/pip install -r requirements.txt
+    name: "Install requirements"

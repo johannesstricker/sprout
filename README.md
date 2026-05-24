@@ -109,50 +109,55 @@ Sprout supports initialization hooks that run automatically when creating a work
 - Copying `.env` files from the main repository
 - Installing dependencies
 - Running setup scripts
-- Creating necessary directories
 
-### Creating an Init Hook
+There are two supported forms:
 
-In your git repository, create a `.sprout/init` file with your setup script:
+1. **`.sprout/init.yaml`** (preferred) — a declarative YAML file describing files to copy and commands to run. Requires `yq` and `jq` on `PATH`.
+2. **`.sprout/init`** (fallback) — an executable shell script. Used only when no `init.yaml` is present.
 
-```bash
-#!/bin/bash
-# .sprout/init - Initialize sprout worktrees
+### YAML hook format
 
-set -e
+```yaml
+# .sprout/init.yaml
 
-echo "Setting up worktree..."
+copy:
+  # shorthand: copies <repo>/.env to <worktree>/.env
+  - .env
 
-# Copy .env file from main repository
-if [ -f "$SPROUT_REPO_ROOT/.env" ]; then
-    cp "$SPROUT_REPO_ROOT/.env" .env
-    echo "Copied .env file"
-fi
+  # explicit form with all options
+  - src: config/secrets.json
+    dest: config/secrets.json   # default: same path as src
+    optional: true              # default: false (missing src is a hard error)
+    name: "Project secrets"     # optional log label
 
-# Copy .env.example and rename it
-if [ -f "$SPROUT_REPO_ROOT/.env.example" ]; then
-    cp "$SPROUT_REPO_ROOT/.env.example" .env.local
-    echo "Copied .env.example"
-fi
+  # globs in src work; each match keeps its filename
+  - src: "config/*.local.json"
+    optional: true
 
-# Install dependencies (example for Node.js)
-if [ -f "package.json" ]; then
-    npm install
-    echo "Dependencies installed"
-fi
+run:
+  # shorthand
+  - npm ci
 
-echo "Worktree initialized successfully!"
+  # explicit form
+  - cmd: npm run prepare
+    allow_failure: true         # default: false
+    name: "Setup husky hooks"
 ```
 
-### Hook Environment Variables
+**Semantics:**
 
-The init hook has access to the following environment variables:
+- `copy:` runs before `run:`. Within each section, entries execute top-to-bottom.
+- `copy.src` is resolved relative to the source repository root; `copy.dest` (and shorthand strings) are resolved relative to the new worktree.
+- When `src` contains a glob and `dest` is set, `dest` is treated as a directory and each match is placed inside it.
+- `optional: true` silently skips entries whose source does not exist (including empty glob expansions). Default is a hard error.
+- `run.cmd` runs in the worktree with `$SPROUT_REPO_ROOT`, `$SPROUT_WORKTREE_PATH`, and `$SPROUT_WORKTREE_NAME` exported. A non-zero exit aborts unless `allow_failure: true`.
+- Each step auto-logs a one-line summary; `name:` overrides the default text.
 
-- `SPROUT_WORKTREE_PATH` - Full path to the created worktree
-- `SPROUT_REPO_ROOT` - Path to the source repository root
-- `SPROUT_WORKTREE_NAME` - Name of the worktree (last component of path)
+See `examples/init-node.yaml` and `examples/init-python.yaml` for working examples.
 
-The hook executes in the worktree directory (working directory is automatically changed).
+### Legacy shell hook
+
+If `.sprout/init.yaml` is not present but an executable `.sprout/init` exists, sprout runs it as a bash script. The script executes in the worktree directory with the same three environment variables exported (`SPROUT_WORKTREE_PATH`, `SPROUT_REPO_ROOT`, `SPROUT_WORKTREE_NAME`). Use this when you need shell features the YAML form doesn't cover.
 
 ## Directory Structure
 
@@ -200,23 +205,16 @@ sprout rm feature-dark-mode
 
 ### Advanced: Automatic Setup with Hooks
 
-Create `.sprout/init` in your repository:
+Create `.sprout/init.yaml` in your repository:
 
-```bash
-#!/bin/bash
-# Setup script for worktrees
+```yaml
+copy:
+  - src: .env.template
+    dest: .env
 
-# Copy configuration
-cp "$SPROUT_REPO_ROOT/.env.template" .env
-
-# Setup database
-if command -v psql &> /dev/null; then
-    psql -U postgres -c "CREATE DATABASE myapp_${SPROUT_WORKTREE_NAME};"
-fi
-
-# Install and build
-npm install
-npm run build
+run:
+  - npm ci
+  - npm run build
 ```
 
 Now every worktree will automatically have these set up!
@@ -272,9 +270,10 @@ sprout add my-feature -b origin/develop
 
 ### Init hook not running
 
-- Check that `.sprout/init` is in the repository root
-- Make sure the file is executable (sprout will make it executable automatically)
-- Check the init hook's output for errors
+- Check that `.sprout/init.yaml` (or the legacy `.sprout/init`) is in the repository root
+- For YAML hooks, make sure `yq` and `jq` are installed and on `PATH`
+- For shell hooks, sprout makes the file executable automatically
+- Check the hook's output for errors
 - The working directory is the new worktree, not the original repository
 
 ### Editor not found

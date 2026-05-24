@@ -75,7 +75,8 @@ Configuration:
 
 Hooks:
   You can define initialization hooks in your repository:
-    .sprout/init      Shell script executed when creating a worktree
+    .sprout/init.yaml   Declarative YAML hook (requires yq, jq)
+    .sprout/init        Legacy executable shell script (used if no init.yaml)
 
 EOF
 }
