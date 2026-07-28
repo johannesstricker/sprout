@@ -73,6 +73,64 @@ sprout dir feature-x
 sprout dir nonexistent
 ```
 
+### Changing into a Worktree
+
+```bash
+# Change into the directory of a worktree
+sprout cd feature-x
+```
+
+Without shell integration this starts a new shell inside the worktree - type
+`exit` (or press `Ctrl-D`) to return to where you came from. The shell is taken
+from `$SHELL`.
+
+To have `sprout cd` change the directory of your *current* shell instead, add the
+shell integration below. A command can never change its parent shell's working
+directory, so this small wrapper function is required.
+
+**Bash / Zsh** - add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+sprout() {
+    if [ "$1" = "cd" ]; then
+        shift
+        local dir
+        dir=$(command sprout dir "$@") || return $?
+        if [ -z "$dir" ]; then
+            echo "sprout: worktree '$1' does not exist" >&2
+            return 1
+        fi
+        cd "$dir"
+    else
+        command sprout "$@"
+    fi
+}
+```
+
+**Fish** - add to `~/.config/fish/config.fish`:
+
+```fish
+function sprout
+    if test "$argv[1]" = cd
+        if test (count $argv) -lt 2
+            echo "sprout: worktree name is required" >&2
+            return 1
+        end
+        set -l dir (command sprout dir $argv[2..-1])
+        if test -z "$dir"
+            echo "sprout: worktree '$argv[2]' does not exist" >&2
+            return 1
+        end
+        cd $dir
+    else
+        command sprout $argv
+    end
+end
+```
+
+All other sprout commands are passed straight through to the real binary, so tab
+completion keeps working.
+
 ### Creating and Opening a Worktree
 
 ```bash
@@ -188,7 +246,10 @@ sprout start feature-dark-mode
 sprout add feature-dark-mode
 sprout open feature-dark-mode
 
-# Get the path for scripting
+# Jump into the worktree in your shell
+sprout cd feature-dark-mode
+
+# Or get the path for scripting
 WORKTREE=$(sprout dir feature-dark-mode)
 cd $WORKTREE
 

@@ -16,6 +16,7 @@ source "$LIB_DIR/utils.sh"
 # Source command implementations
 source "$LIB_DIR/commands/add.sh"
 source "$LIB_DIR/commands/dir.sh"
+source "$LIB_DIR/commands/cd.sh"
 source "$LIB_DIR/commands/list.sh"
 source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
@@ -36,6 +37,11 @@ Commands:
                         -b <branch>   Checkout a specific branch (default: repo default)
 
   dir <name>          Print the directory path of a worktree
+
+  cd <name>           Change into the directory of a worktree
+                      Starts a new shell there; type 'exit' to come back.
+                      Enable shell integration (see README) to change the
+                      directory of the current shell instead.
 
   list                List all worktrees in the current repository
                       Options:
@@ -85,7 +91,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|list|rm|open|start|checkout|cleanup|config|help|-h|--help|"")
+        add|dir|cd|list|rm|open|start|checkout|cleanup|config|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -109,6 +115,9 @@ main() {
             ;;
         dir)
             cmd_dir "$@"
+            ;;
+        cd)
+            cmd_cd "$@"
             ;;
         list)
             cmd_list "$@"

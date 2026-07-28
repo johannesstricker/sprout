@@ -25,6 +25,7 @@ _sprout() {
     commands=(
         'add:Create a new worktree'
         'dir:Print the directory path of a worktree'
+        'cd:Change into the directory of a worktree'
         'list:List all worktrees'
         'rm:Remove a worktree'
         'open:Open a worktree with the configured editor'
@@ -50,7 +51,7 @@ _sprout() {
                         '1:name:' \
                         '-b[Checkout a specific branch]:branch:_sprout_branches'
                     ;;
-                dir)
+                dir|cd)
                     _arguments '1:worktree:_sprout_worktrees'
                     ;;
                 list)

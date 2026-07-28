@@ -40,6 +40,7 @@ complete -c sprout -f
 # Top-level commands
 complete -c sprout -n __sprout_needs_command -a add -d 'Create a new worktree'
 complete -c sprout -n __sprout_needs_command -a dir -d 'Print the directory path of a worktree'
+complete -c sprout -n __sprout_needs_command -a cd -d 'Change into the directory of a worktree'
 complete -c sprout -n __sprout_needs_command -a list -d 'List all worktrees'
 complete -c sprout -n __sprout_needs_command -a rm -d 'Remove a worktree'
 complete -c sprout -n __sprout_needs_command -a open -d 'Open a worktree with the configured editor'
@@ -54,6 +55,9 @@ complete -c sprout -n '__sprout_using_command add' -s b -d 'Checkout a specific 
 
 # dir: complete worktree names
 complete -c sprout -n '__sprout_using_command dir' -a '(__sprout_worktrees)'
+
+# cd: complete worktree names
+complete -c sprout -n '__sprout_using_command cd' -a '(__sprout_worktrees)'
 
 # list: flags
 complete -c sprout -n '__sprout_using_command list' -l verbose -d 'Show full paths'

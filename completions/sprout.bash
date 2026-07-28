@@ -4,7 +4,7 @@ _sprout() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="add dir list rm open start checkout cleanup config help"
+    local commands="add dir cd list rm open start checkout cleanup config help"
     local config_subcmds="set get show"
     local config_keys="worktree_dir editor"
 
@@ -31,7 +31,7 @@ _sprout() {
                     ;;
             esac
             ;;
-        dir)
+        dir|cd)
             local worktrees
             worktrees=$(sprout list 2>/dev/null)
             COMPREPLY=($(compgen -W "$worktrees" -- "$cur"))

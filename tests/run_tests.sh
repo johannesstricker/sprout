@@ -45,6 +45,7 @@ test_libraries_exist() {
     [ -f "$PROJECT_ROOT/lib/hooks.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/add.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/dir.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/cd.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/list.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/rm.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/open.sh" ] && \
@@ -391,6 +392,106 @@ test_start_missing_name() {
 
     # Run start without a name - should fail
     "$PROJECT_ROOT/bin/sprout" start > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
+# Test: Cd command starts a shell inside the worktree
+test_cd_enters_worktree() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    local default_branch
+    default_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    "$PROJECT_ROOT/bin/sprout" add "test-wt" -b "$default_branch" > /dev/null 2>&1
+
+    # A fake shell that reports the directory it was started in
+    local fake_shell="$temp_dir/fake-shell"
+    cat > "$fake_shell" << 'EOF'
+#!/bin/bash
+pwd -P
+EOF
+    chmod +x "$fake_shell"
+
+    local expected
+    expected=$(cd "$temp_dir/worktrees/test-repo/test-wt" && pwd -P)
+
+    local output
+    output=$(SHELL="$fake_shell" "$PROJECT_ROOT/bin/sprout" cd "test-wt" 2>&1)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "$expected" ]
+}
+
+# Test: Cd command fails when the worktree does not exist
+test_cd_fails_when_missing() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    SHELL="/bin/bash" "$PROJECT_ROOT/bin/sprout" cd "nonexistent" > /dev/null 2>&1 < /dev/null
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
+# Test: Cd command fails without a name
+test_cd_missing_name() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+
+    SHELL="/bin/bash" "$PROJECT_ROOT/bin/sprout" cd > /dev/null 2>&1 < /dev/null
     local exit_code=$?
 
     # Cleanup
@@ -1093,6 +1194,13 @@ echo "--------------------"
 run_test "Start command creates worktree and opens editor" "test_start_creates_worktree"
 run_test "Start command with -b flag" "test_start_with_branch"
 run_test "Start command fails without name" "test_start_missing_name"
+
+echo ""
+echo "Cd Command Tests:"
+echo "-----------------"
+run_test "Cd command starts a shell in the worktree" "test_cd_enters_worktree"
+run_test "Cd command fails when worktree does not exist" "test_cd_fails_when_missing"
+run_test "Cd command fails without name" "test_cd_missing_name"
 
 echo ""
 echo "Checkout Command Tests:"
