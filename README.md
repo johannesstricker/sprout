@@ -8,6 +8,7 @@ Sprout is a bash utility that simplifies git worktree management. It provides a 
 - **Configuration management** - Global configuration for worktree directory and editor preferences
 - **Initialization hooks** - Run custom setup scripts when creating worktrees (e.g., copy `.env` files, install dependencies)
 - **Editor integration** - Open worktrees with your preferred editor
+- **Shell integration** - Jump into a worktree with `sprout cd` in zsh, bash, and fish
 - **Easy cleanup** - Remove worktrees with a simple command
 - **Shell completions** - Tab completion for zsh, bash, and fish
 
@@ -72,6 +73,42 @@ sprout dir feature-x
 # Exit silently if the worktree doesn't exist (useful for scripts)
 sprout dir nonexistent
 ```
+
+### Changing into a Worktree
+
+```bash
+# Change into the directory of a worktree
+sprout cd feature-x
+```
+
+This requires shell integration (see below). A process can never change the
+working directory of the shell that started it, so `sprout cd` needs a small
+wrapper function in your shell - the same approach used by tools like `zoxide`
+and `direnv`. Without it, `sprout cd` prints setup instructions instead of
+silently doing nothing.
+
+### Shell Integration
+
+Add the matching line to your shell config and restart your shell:
+
+```bash
+# ~/.bashrc
+eval "$(sprout shell-init bash)"
+
+# ~/.zshrc
+eval "$(sprout shell-init zsh)"
+```
+
+```fish
+# ~/.config/fish/config.fish
+sprout shell-init fish | source
+```
+
+`sprout shell-init` defaults to the shell in `$SHELL`, so a bare
+`eval "$(sprout shell-init)"` works too. Run it without `eval` to see exactly
+what it defines: a `sprout` function that handles `cd` itself and passes every
+other subcommand through to the real binary, so the rest of sprout - including
+tab completion - is unaffected.
 
 ### Creating and Opening a Worktree
 
@@ -188,7 +225,10 @@ sprout start feature-dark-mode
 sprout add feature-dark-mode
 sprout open feature-dark-mode
 
-# Get the path for scripting
+# Jump into the worktree in your shell
+sprout cd feature-dark-mode
+
+# Or get the path for scripting
 WORKTREE=$(sprout dir feature-dark-mode)
 cd $WORKTREE
 

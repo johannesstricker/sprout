@@ -2,7 +2,7 @@
 # sprout dir command - Print the directory of a worktree
 
 cmd_dir() {
-    local name="$1"
+    local name="${1:-}"
 
     if [[ -z "$name" ]]; then
         echo "Error: worktree name is required" >&2

@@ -25,12 +25,14 @@ _sprout() {
     commands=(
         'add:Create a new worktree'
         'dir:Print the directory path of a worktree'
+        'cd:Change into the directory of a worktree'
         'list:List all worktrees'
         'rm:Remove a worktree'
         'open:Open a worktree with the configured editor'
         'start:Create a new worktree and open it in the editor'
         'checkout:Checkout an existing branch into a new worktree'
         'cleanup:Remove worktrees whose branches have been merged'
+        'shell-init:Print the shell integration needed by sprout cd'
         'config:Manage sprout configuration'
         'help:Show help message'
     )
@@ -50,7 +52,7 @@ _sprout() {
                         '1:name:' \
                         '-b[Checkout a specific branch]:branch:_sprout_branches'
                     ;;
-                dir)
+                dir|cd)
                     _arguments '1:worktree:_sprout_worktrees'
                     ;;
                 list)
@@ -79,6 +81,9 @@ _sprout() {
                 cleanup)
                     _arguments \
                         '(-n --dry-run)'{-n,--dry-run}'[Show what would be removed]'
+                    ;;
+                shell-init)
+                    _arguments '1:shell:(bash zsh fish)'
                     ;;
                 config)
                     local -a config_subcmds

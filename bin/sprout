@@ -16,6 +16,8 @@ source "$LIB_DIR/utils.sh"
 # Source command implementations
 source "$LIB_DIR/commands/add.sh"
 source "$LIB_DIR/commands/dir.sh"
+source "$LIB_DIR/commands/cd.sh"
+source "$LIB_DIR/commands/shell-init.sh"
 source "$LIB_DIR/commands/list.sh"
 source "$LIB_DIR/commands/rm.sh"
 source "$LIB_DIR/commands/open.sh"
@@ -37,6 +39,9 @@ Commands:
 
   dir <name>          Print the directory path of a worktree
 
+  cd <name>           Change into the directory of a worktree
+                      Requires shell integration, see 'shell-init' below.
+
   list                List all worktrees in the current repository
                       Options:
                         --verbose, --full, -v   Show full paths instead of names
@@ -57,6 +62,12 @@ Commands:
   cleanup             Remove worktrees whose branches have been merged
                       Options:
                         -n, --dry-run   Show what would be removed without removing
+
+  shell-init [shell]  Print the shell integration needed by 'sprout cd'
+                      Defaults to the shell from $SHELL. Add to your config:
+                        bash    eval "$(sprout shell-init bash)"
+                        zsh     eval "$(sprout shell-init zsh)"
+                        fish    sprout shell-init fish | source
 
   config              Manage sprout configuration
                       Subcommands:
@@ -85,7 +96,7 @@ parse_args() {
     local cmd="${1:-}"
 
     case "$cmd" in
-        add|dir|list|rm|open|start|checkout|cleanup|config|help|-h|--help|"")
+        add|dir|cd|list|rm|open|start|checkout|cleanup|shell-init|config|help|-h|--help|"")
             return 0
             ;;
         *)
@@ -110,6 +121,9 @@ main() {
         dir)
             cmd_dir "$@"
             ;;
+        cd)
+            cmd_cd "$@"
+            ;;
         list)
             cmd_list "$@"
             ;;
@@ -127,6 +141,9 @@ main() {
             ;;
         cleanup)
             cmd_cleanup "$@"
+            ;;
+        shell-init)
+            cmd_shell_init "$@"
             ;;
         config)
             cmd_config "$@"

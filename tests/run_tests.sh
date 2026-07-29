@@ -45,6 +45,8 @@ test_libraries_exist() {
     [ -f "$PROJECT_ROOT/lib/hooks.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/add.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/dir.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/cd.sh" ] && \
+    [ -f "$PROJECT_ROOT/lib/commands/shell-init.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/list.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/rm.sh" ] && \
     [ -f "$PROJECT_ROOT/lib/commands/open.sh" ] && \
@@ -399,6 +401,315 @@ test_start_missing_name() {
     rm -rf "$temp_dir"
 
     [ $exit_code -ne 0 ]
+}
+
+# Test: Cd command prints the worktree path for the shell wrapper
+test_cd_prints_path() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    local default_branch
+    default_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    "$PROJECT_ROOT/bin/sprout" add "test-wt" -b "$default_branch" > /dev/null 2>&1
+
+    local expected="$temp_dir/worktrees/test-repo/test-wt"
+
+    # Stdout is captured here, exactly like in the shell wrapper
+    local output
+    output=$("$PROJECT_ROOT/bin/sprout" cd "test-wt" 2>/dev/null)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "$expected" ]
+}
+
+# Test: Cd command fails when the worktree does not exist
+test_cd_fails_when_missing() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    "$PROJECT_ROOT/bin/sprout" cd "nonexistent" > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
+# Test: Cd command fails without a name
+test_cd_missing_name() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+
+    "$PROJECT_ROOT/bin/sprout" cd > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$test_repo"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ]
+}
+
+# Helper: set up a repo with a single worktree named 'test-wt'
+# Sets HOME and cds into the repo, so it must be called directly rather than
+# in a command substitution, which would run it in a subshell.
+# The worktree ends up at $temp_dir/worktrees/test-repo/test-wt
+setup_repo_with_worktree() {
+    local temp_dir="$1"
+    export HOME="$temp_dir"
+
+    local test_repo="$temp_dir/test-repo"
+    git init "$test_repo" > /dev/null 2>&1
+    cd "$test_repo"
+    git config user.name "Test User" > /dev/null 2>&1
+    git config user.email "test@test.com" > /dev/null 2>&1
+
+    echo "test" > README.md
+    git add README.md > /dev/null 2>&1
+    git commit -m "Initial commit" > /dev/null 2>&1
+
+    local default_branch
+    default_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    source "$PROJECT_ROOT/lib/config.sh"
+    init_config > /dev/null 2>&1
+    set_config "worktree_dir" "$temp_dir/worktrees"
+
+    "$PROJECT_ROOT/bin/sprout" add "test-wt" -b "$default_branch" > /dev/null 2>&1
+}
+
+# Test: The bash integration changes the directory of the calling shell
+test_shell_init_changes_directory() {
+    local temp_dir=$(mktemp -d)
+    setup_repo_with_worktree "$temp_dir" > /dev/null
+
+    # A shell session that installs the integration and uses it
+    local session="$temp_dir/session.bash"
+    cat > "$session" << 'EOF'
+export PATH="$SPROUT_BIN_DIR:$PATH"
+eval "$(sprout shell-init bash)"
+cd "$SPROUT_TEST_REPO"
+sprout cd test-wt || exit 1
+pwd -P
+EOF
+
+    local expected
+    expected=$(cd "$temp_dir/worktrees/test-repo/test-wt" && pwd -P)
+
+    local output
+    output=$(SPROUT_BIN_DIR="$PROJECT_ROOT/bin" SPROUT_TEST_REPO="$temp_dir/test-repo" \
+        bash "$session" 2>/dev/null)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "$expected" ]
+}
+
+# Test: The integration reports failure and stays put for a missing worktree
+test_shell_init_reports_missing_worktree() {
+    local temp_dir=$(mktemp -d)
+    setup_repo_with_worktree "$temp_dir" > /dev/null
+
+    local session="$temp_dir/session.bash"
+    cat > "$session" << 'EOF'
+export PATH="$SPROUT_BIN_DIR:$PATH"
+eval "$(sprout shell-init bash)"
+cd "$SPROUT_TEST_REPO"
+sprout cd nonexistent && exit 1
+# The failed cd must not have moved us
+[ "$PWD" = "$SPROUT_TEST_REPO" ] || exit 1
+EOF
+
+    SPROUT_BIN_DIR="$PROJECT_ROOT/bin" SPROUT_TEST_REPO="$temp_dir/test-repo" \
+        bash "$session" > /dev/null 2>&1
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ]
+}
+
+# Test: The integration passes other commands through to the binary
+test_shell_init_passes_through() {
+    local temp_dir=$(mktemp -d)
+    setup_repo_with_worktree "$temp_dir" > /dev/null
+
+    local session="$temp_dir/session.bash"
+    cat > "$session" << 'EOF'
+export PATH="$SPROUT_BIN_DIR:$PATH"
+eval "$(sprout shell-init bash)"
+cd "$SPROUT_TEST_REPO"
+sprout list
+EOF
+
+    local output
+    output=$(SPROUT_BIN_DIR="$PROJECT_ROOT/bin" SPROUT_TEST_REPO="$temp_dir/test-repo" \
+        bash "$session" 2>/dev/null)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "test-wt" ]
+}
+
+# Test: The zsh integration changes the directory of the calling shell
+# Only run when zsh is installed, see the runner below.
+test_shell_init_zsh_changes_directory() {
+    local temp_dir=$(mktemp -d)
+    setup_repo_with_worktree "$temp_dir" > /dev/null
+
+    local session="$temp_dir/session.zsh"
+    cat > "$session" << 'EOF'
+export PATH="$SPROUT_BIN_DIR:$PATH"
+eval "$(sprout shell-init zsh)"
+cd "$SPROUT_TEST_REPO"
+sprout cd test-wt || exit 1
+pwd -P
+EOF
+
+    local expected
+    expected=$(cd "$temp_dir/worktrees/test-repo/test-wt" && pwd -P)
+
+    local output
+    output=$(SPROUT_BIN_DIR="$PROJECT_ROOT/bin" SPROUT_TEST_REPO="$temp_dir/test-repo" \
+        zsh "$session" 2>/dev/null)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "$expected" ]
+}
+
+# Test: The fish integration changes the directory of the calling shell
+# Only run when fish is installed, see the runner below.
+test_shell_init_fish_changes_directory() {
+    local temp_dir=$(mktemp -d)
+    setup_repo_with_worktree "$temp_dir" > /dev/null
+
+    local session="$temp_dir/session.fish"
+    cat > "$session" << 'EOF'
+set -x PATH $SPROUT_BIN_DIR $PATH
+sprout shell-init fish | source
+cd $SPROUT_TEST_REPO
+sprout cd test-wt
+or exit 1
+command pwd -P
+# A missing worktree must fail without moving the shell
+sprout cd nonexistent
+and exit 1
+exit 0
+EOF
+
+    local expected
+    expected=$(cd "$temp_dir/worktrees/test-repo/test-wt" && pwd -P)
+
+    local output
+    output=$(SPROUT_BIN_DIR="$PROJECT_ROOT/bin" SPROUT_TEST_REPO="$temp_dir/test-repo" \
+        fish "$session" 2>/dev/null)
+    local exit_code=$?
+
+    # Cleanup
+    cd "$temp_dir"
+    rm -rf "$temp_dir/test-repo" "$temp_dir/worktrees"
+    rm -rf "$temp_dir"
+
+    [ $exit_code -eq 0 ] && [ "$output" = "$expected" ]
+}
+
+# Test: shell-init emits valid code for every supported shell
+test_shell_init_supported_shells() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    # bash and zsh output must be syntactically valid shell
+    "$PROJECT_ROOT/bin/sprout" shell-init bash | bash -n || return 1
+    "$PROJECT_ROOT/bin/sprout" shell-init zsh | bash -n || return 1
+
+    # fish output cannot be checked with bash, so check it defines the function
+    "$PROJECT_ROOT/bin/sprout" shell-init fish | grep -q "^function sprout$" || return 1
+
+    # Defaults to $SHELL
+    local output
+    output=$(SHELL="/bin/bash" "$PROJECT_ROOT/bin/sprout" shell-init)
+    [[ "$output" == *"command sprout"* ]] || return 1
+
+    rm -rf "$temp_dir"
+    return 0
+}
+
+# Test: shell-init rejects unknown shells
+test_shell_init_unsupported_shell() {
+    local temp_dir=$(mktemp -d)
+    export HOME="$temp_dir"
+
+    "$PROJECT_ROOT/bin/sprout" shell-init tcsh > /dev/null 2>&1
+    local exit_code=$?
+
+    # An undetectable shell is an error too, not a silent no-op
+    SHELL="" "$PROJECT_ROOT/bin/sprout" shell-init > /dev/null 2>&1
+    local undetected_code=$?
+
+    rm -rf "$temp_dir"
+
+    [ $exit_code -ne 0 ] && [ $undetected_code -ne 0 ]
 }
 
 # Test: Checkout an existing local branch
@@ -1093,6 +1404,34 @@ echo "--------------------"
 run_test "Start command creates worktree and opens editor" "test_start_creates_worktree"
 run_test "Start command with -b flag" "test_start_with_branch"
 run_test "Start command fails without name" "test_start_missing_name"
+
+echo ""
+echo "Cd Command Tests:"
+echo "-----------------"
+run_test "Cd command prints the worktree path" "test_cd_prints_path"
+run_test "Cd command fails when worktree does not exist" "test_cd_fails_when_missing"
+run_test "Cd command fails without name" "test_cd_missing_name"
+
+echo ""
+echo "Shell Integration Tests:"
+echo "------------------------"
+run_test "Integration changes the directory of the calling shell" "test_shell_init_changes_directory"
+run_test "Integration reports a missing worktree and stays put" "test_shell_init_reports_missing_worktree"
+run_test "Integration passes other commands through" "test_shell_init_passes_through"
+run_test "Shell-init supports bash, zsh and fish" "test_shell_init_supported_shells"
+run_test "Shell-init rejects unknown shells" "test_shell_init_unsupported_shell"
+
+if command -v zsh > /dev/null 2>&1; then
+    run_test "Integration changes the directory in zsh" "test_shell_init_zsh_changes_directory"
+else
+    echo "Skipping: Integration changes the directory in zsh (zsh not installed)"
+fi
+
+if command -v fish > /dev/null 2>&1; then
+    run_test "Integration changes the directory in fish" "test_shell_init_fish_changes_directory"
+else
+    echo "Skipping: Integration changes the directory in fish (fish not installed)"
+fi
 
 echo ""
 echo "Checkout Command Tests:"
