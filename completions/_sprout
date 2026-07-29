@@ -32,6 +32,7 @@ _sprout() {
         'start:Create a new worktree and open it in the editor'
         'checkout:Checkout an existing branch into a new worktree'
         'cleanup:Remove worktrees whose branches have been merged'
+        'shell-init:Print the shell integration needed by sprout cd'
         'config:Manage sprout configuration'
         'help:Show help message'
     )
@@ -80,6 +81,9 @@ _sprout() {
                 cleanup)
                     _arguments \
                         '(-n --dry-run)'{-n,--dry-run}'[Show what would be removed]'
+                    ;;
+                shell-init)
+                    _arguments '1:shell:(bash zsh fish)'
                     ;;
                 config)
                     local -a config_subcmds

@@ -4,7 +4,7 @@ _sprout() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="add dir cd list rm open start checkout cleanup config help"
+    local commands="add dir cd list rm open start checkout cleanup shell-init config help"
     local config_subcmds="set get show"
     local config_keys="worktree_dir editor"
 
@@ -105,6 +105,11 @@ _sprout() {
         cleanup)
             if [[ "$cur" == -* ]]; then
                 COMPREPLY=($(compgen -W "-n --dry-run" -- "$cur"))
+            fi
+            ;;
+        shell-init)
+            if [[ $cword -eq 2 ]]; then
+                COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur"))
             fi
             ;;
         config)

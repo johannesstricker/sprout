@@ -8,6 +8,7 @@ Sprout is a bash utility that simplifies git worktree management. It provides a 
 - **Configuration management** - Global configuration for worktree directory and editor preferences
 - **Initialization hooks** - Run custom setup scripts when creating worktrees (e.g., copy `.env` files, install dependencies)
 - **Editor integration** - Open worktrees with your preferred editor
+- **Shell integration** - Jump into a worktree with `sprout cd` in zsh, bash, and fish
 - **Easy cleanup** - Remove worktrees with a simple command
 - **Shell completions** - Tab completion for zsh, bash, and fish
 
@@ -80,56 +81,34 @@ sprout dir nonexistent
 sprout cd feature-x
 ```
 
-Without shell integration this starts a new shell inside the worktree - type
-`exit` (or press `Ctrl-D`) to return to where you came from. The shell is taken
-from `$SHELL`.
+This requires shell integration (see below). A process can never change the
+working directory of the shell that started it, so `sprout cd` needs a small
+wrapper function in your shell - the same approach used by tools like `zoxide`
+and `direnv`. Without it, `sprout cd` prints setup instructions instead of
+silently doing nothing.
 
-To have `sprout cd` change the directory of your *current* shell instead, add the
-shell integration below. A command can never change its parent shell's working
-directory, so this small wrapper function is required.
+### Shell Integration
 
-**Bash / Zsh** - add to `~/.bashrc` or `~/.zshrc`:
+Add the matching line to your shell config and restart your shell:
 
 ```bash
-sprout() {
-    if [ "$1" = "cd" ]; then
-        shift
-        local dir
-        dir=$(command sprout dir "$@") || return $?
-        if [ -z "$dir" ]; then
-            echo "sprout: worktree '$1' does not exist" >&2
-            return 1
-        fi
-        cd "$dir"
-    else
-        command sprout "$@"
-    fi
-}
-```
+# ~/.bashrc
+eval "$(sprout shell-init bash)"
 
-**Fish** - add to `~/.config/fish/config.fish`:
+# ~/.zshrc
+eval "$(sprout shell-init zsh)"
+```
 
 ```fish
-function sprout
-    if test "$argv[1]" = cd
-        if test (count $argv) -lt 2
-            echo "sprout: worktree name is required" >&2
-            return 1
-        end
-        set -l dir (command sprout dir $argv[2..-1])
-        if test -z "$dir"
-            echo "sprout: worktree '$argv[2]' does not exist" >&2
-            return 1
-        end
-        cd $dir
-    else
-        command sprout $argv
-    end
-end
+# ~/.config/fish/config.fish
+sprout shell-init fish | source
 ```
 
-All other sprout commands are passed straight through to the real binary, so tab
-completion keeps working.
+`sprout shell-init` defaults to the shell in `$SHELL`, so a bare
+`eval "$(sprout shell-init)"` works too. Run it without `eval` to see exactly
+what it defines: a `sprout` function that handles `cd` itself and passes every
+other subcommand through to the real binary, so the rest of sprout - including
+tab completion - is unaffected.
 
 ### Creating and Opening a Worktree
 

@@ -39,18 +39,27 @@ cmd_cd() {
         return 1
     fi
 
-    cd "$worktree_path" || return 1
+    # A process cannot change the working directory of the shell that started
+    # it, so the actual 'cd' is done by the shell function from
+    # 'sprout shell-init', which captures the path printed below.
+    #
+    # A terminal on stdout therefore means that wrapper is not installed:
+    # printing a path would look like the command silently did nothing, so
+    # explain how to set it up instead.
+    if [[ -t 1 ]]; then
+        cat >&2 << 'EOF'
+Error: 'sprout cd' needs shell integration to change your current directory.
 
-    # A child process cannot change the working directory of its parent, so
-    # start a new shell in the worktree instead. Leave it with 'exit' to
-    # return to where you were. Shell integration (see README) overrides this
-    # command to change the directory of the current shell.
-    local shell="${SHELL:-/bin/bash}"
+Add one of these to your shell config, then restart your shell:
 
-    if ! command -v "$shell" > /dev/null 2>&1; then
-        echo "Error: Shell '$shell' not found" >&2
+  bash    eval "$(sprout shell-init bash)"       # ~/.bashrc
+  zsh     eval "$(sprout shell-init zsh)"        # ~/.zshrc
+  fish    sprout shell-init fish | source        # ~/.config/fish/config.fish
+
+Until then, use: cd "$(sprout dir <name>)"
+EOF
         return 1
     fi
 
-    exec "$shell"
+    echo "$worktree_path"
 }

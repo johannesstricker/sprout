@@ -47,6 +47,7 @@ complete -c sprout -n __sprout_needs_command -a open -d 'Open a worktree with th
 complete -c sprout -n __sprout_needs_command -a start -d 'Create a new worktree and open it in the editor'
 complete -c sprout -n __sprout_needs_command -a checkout -d 'Checkout an existing branch into a new worktree'
 complete -c sprout -n __sprout_needs_command -a cleanup -d 'Remove worktrees whose branches have been merged'
+complete -c sprout -n __sprout_needs_command -a shell-init -d 'Print the shell integration needed by sprout cd'
 complete -c sprout -n __sprout_needs_command -a config -d 'Manage sprout configuration'
 complete -c sprout -n __sprout_needs_command -a help -d 'Show help message'
 
@@ -81,6 +82,9 @@ complete -c sprout -n '__sprout_using_command start' -s e -l editor -d 'Use spec
 
 # cleanup: flags
 complete -c sprout -n '__sprout_using_command cleanup' -s n -l dry-run -d 'Show what would be removed'
+
+# shell-init: supported shells
+complete -c sprout -n '__sprout_using_command shell-init' -a 'bash zsh fish'
 
 # config: subcommands
 complete -c sprout -n __sprout_config_needs_subcmd -a set -d 'Set a configuration value'
